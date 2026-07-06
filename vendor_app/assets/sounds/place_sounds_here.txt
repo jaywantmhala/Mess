@@ -1,0 +1,1 @@
+Place your sound files (e.g. notification.mp3, alert.wav) in this directory.

@@ -1,0 +1,3 @@
+.gradle_fresh/
+.gradle/
+*.log

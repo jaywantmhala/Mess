@@ -4,6 +4,7 @@ import '../../services/wallet_service.dart';
 import '../../models/customer.dart';
 import '../wallet_screen.dart';
 import '../welcome_screen.dart';
+import '../your_orders_screen.dart';
 
 class ProfileTab extends StatefulWidget {
   const ProfileTab({super.key});
@@ -260,7 +261,67 @@ class _ProfileTabState extends State<ProfileTab> {
                           ),
                         ),
                       ),
-                      const SizedBox(height: 28),
+                      const SizedBox(height: 16),
+
+                      // 2.5 Your Orders Option
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFEEF0F4)),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.01),
+                              blurRadius: 10,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: ListTile(
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                          leading: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: const BoxDecoration(
+                              color: coralSoft,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.receipt_long_rounded,
+                              color: coralPrimary,
+                              size: 20,
+                            ),
+                          ),
+                          title: const Text(
+                            'Your Orders',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: textDark,
+                            ),
+                          ),
+                          subtitle: const Text(
+                            'View your order history & status',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: textGrey,
+                            ),
+                          ),
+                          trailing: const Icon(
+                            Icons.arrow_forward_ios_rounded,
+                            color: textGrey,
+                            size: 14,
+                          ),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const YourOrdersScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 24),
 
                       // 3. Dietary Preferences Section
                       const Text(

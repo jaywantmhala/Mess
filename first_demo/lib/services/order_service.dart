@@ -72,7 +72,8 @@ class OrderService {
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       if (body['success'] == true && body['data'] != null) {
-        final list = body['data'] as List;
+        final dataMap = body['data'] as Map<String, dynamic>;
+        final list = dataMap['orders'] as List? ?? [];
         return list
             .map((o) =>
                 OrderHistoryItem.fromJson(o as Map<String, dynamic>))

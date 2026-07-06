@@ -53,6 +53,14 @@ try {
     $stmt->execute([':customer_id' => $customerId]);
     $custAddr = $stmt->fetch(PDO::FETCH_ASSOC);
 
+    // Fetch driver details if assigned
+    $driver = null;
+    if ($order['driver_id']) {
+        $stmt = $pdo->prepare("SELECT id, full_name, phone_number, vehicle_number, latitude, longitude FROM drivers WHERE id = ? LIMIT 1");
+        $stmt->execute([$order['driver_id']]);
+        $driver = $stmt->fetch(PDO::FETCH_ASSOC);
+    }
+
     // Fetch order items with food names
     $stmt = $pdo->prepare("
         SELECT oi.price, oi.quantity, m.food_name 
@@ -73,11 +81,11 @@ try {
     $data = [
         'order_id' => (int)$order['order_id'],
         'status' => $order['status'],
-        'subtotal' => (double)$subtotal,
-        'delivery_fee' => (double)$order['delivery_fee'],
-        'tax_amount' => (double)$order['tax_amount'],
-        'grand_total' => (double)$order['grand_total'],
-        'wallet_deducted' => (double)$order['wallet_deducted'],
+        'subtotal' => (float)$subtotal,
+        'delivery_fee' => (float)$order['delivery_fee'],
+        'tax_amount' => (float)$order['tax_amount'],
+        'grand_total' => (float)$order['grand_total'],
+        'wallet_deducted' => (float)$order['wallet_deducted'],
         'payment_method' => $order['payment_method'],
         'delivery_address' => $order['delivery_address'],
         'created_at' => $order['created_at'],
@@ -87,25 +95,30 @@ try {
             'hotel_address' => $hotel['hotel_address'],
             'rating' => '4.0', // Default rating representation
             'photo_url' => $hotel['photo_url'] ? $hotel['photo_url'] : '',
-            'latitude' => (double)$hotel['latitude'],
-            'longitude' => (double)$hotel['longitude']
+            'latitude' => (float)$hotel['latitude'],
+            'longitude' => (float)$hotel['longitude']
         ],
         'customer' => [
-            'latitude' => $custAddr ? (double)$custAddr['latitude'] : 18.5204,
-            'longitude' => $custAddr ? (double)$custAddr['longitude'] : 73.8567
+            'latitude' => $custAddr ? (float)$custAddr['latitude'] : 18.5204,
+            'longitude' => $custAddr ? (float)$custAddr['longitude'] : 73.8567
         ],
         'items' => array_map(function($i) {
             return [
                 'food_name' => $i['food_name'],
                 'quantity' => (int)$i['quantity'],
-                'price' => (double)$i['price']
+                'price' => (float)$i['price']
             ];
         }, $items),
-        'delivery_partner' => [
-            'name' => 'Rahul',
-            'rating' => '4.0',
-            'avatar_url' => 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=200'
-        ]
+        'delivery_partner' => $driver ? [
+            'id' => (int)$driver['id'],
+            'name' => $driver['full_name'],
+            'rating' => '4.8',
+            'avatar_url' => 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=200',
+            'phone_number' => $driver['phone_number'],
+            'vehicle_number' => $driver['vehicle_number'],
+            'latitude' => (float)$driver['latitude'],
+            'longitude' => (float)$driver['longitude']
+        ] : null
     ];
 
     sendSuccess('Order details retrieved successfully.', $data);

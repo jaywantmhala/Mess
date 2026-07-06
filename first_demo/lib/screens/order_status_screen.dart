@@ -162,6 +162,20 @@ class _OrderStatusScreenState extends State<OrderStatusScreen> {
     return dx * dx + dy * dy;
   }
 
+  int _getClosestRoutePointIndex(LatLng driverPoint) {
+    if (_routePoints.isEmpty) return 0;
+    int closestIndex = 0;
+    double minDistance = double.infinity;
+    for (int i = 0; i < _routePoints.length; i++) {
+      double dist = _getLatLngDistance(_routePoints[i], driverPoint);
+      if (dist < minDistance) {
+        minDistance = dist;
+        closestIndex = i;
+      }
+    }
+    return closestIndex;
+  }
+
   void _startWebSocketListener() {
     WebSocketService.instance.connect();
 
@@ -194,6 +208,25 @@ class _OrderStatusScreenState extends State<OrderStatusScreen> {
           }
         } catch (e) {
           debugPrint('Error parsing status update: $e');
+        }
+      } else if (event == 'DRIVER_LOCATION_UPDATED') {
+        try {
+          final driverId = eventData['driver_id'] as int?;
+          final lat = double.tryParse(eventData['latitude'].toString());
+          final lng = double.tryParse(eventData['longitude'].toString());
+
+          if (lat != null && lng != null && _orderDetails?.deliveryPartner != null) {
+            if (_orderDetails!.deliveryPartner!.id == driverId) {
+              if (mounted) {
+                setState(() {
+                  _orderDetails!.deliveryPartner!.latitude = lat;
+                  _orderDetails!.deliveryPartner!.longitude = lng;
+                });
+              }
+            }
+          }
+        } catch (e) {
+          debugPrint('Error parsing driver location update: $e');
         }
       }
     });
@@ -409,31 +442,47 @@ class _OrderStatusScreenState extends State<OrderStatusScreen> {
                                 child: (_isLoadingDetails || _isLoadingRoute)
                                     ? const Center(child: CircularProgressIndicator(color: themeGreen))
                                     : (() {
-                                        final hotelLat = _orderDetails?.hotel.latitude ?? 18.5284;
-                                        final hotelLng = _orderDetails?.hotel.longitude ?? 73.8739;
-                                        final customerLat = _orderDetails?.customerLatitude ?? 18.5204;
-                                        final customerLng = _orderDetails?.customerLongitude ?? 73.8567;
+                                         final hotelLat = _orderDetails?.hotel.latitude ?? 18.5284;
+                                         final hotelLng = _orderDetails?.hotel.longitude ?? 73.8739;
+                                         final customerLat = _orderDetails?.customerLatitude ?? 18.5204;
+                                         final customerLng = _orderDetails?.customerLongitude ?? 73.8567;
 
-                                        final hotelPoint = LatLng(hotelLat, hotelLng);
-                                        final customerPoint = LatLng(customerLat, customerLng);
+                                         final hotelPoint = LatLng(hotelLat, hotelLng);
+                                         final customerPoint = LatLng(customerLat, customerLng);
 
-                                        // Calculate scooter point along actual road points route
-                                        final scooterPoint = _getScooterPosition(progress);
+                                         // Calculate scooter point (use live driver coordinates if assigned)
+                                         final LatLng scooterPoint;
+                                         final List<LatLng> coveredPath;
+                                         final List<LatLng> remainingPath;
 
-                                        // Calculate map center (midpoint)
-                                        final centerLat = (hotelPoint.latitude + customerPoint.latitude) / 2;
-                                        final centerLng = (hotelPoint.longitude + customerPoint.longitude) / 2;
-                                        final mapCenter = LatLng(centerLat, centerLng);
+                                         if (_orderDetails?.deliveryPartner != null && 
+                                             _orderDetails!.deliveryPartner!.latitude != 0.0) {
+                                           scooterPoint = LatLng(
+                                             _orderDetails!.deliveryPartner!.latitude,
+                                             _orderDetails!.deliveryPartner!.longitude,
+                                           );
+                                           
+                                           final int idx = _getClosestRoutePointIndex(scooterPoint);
+                                           coveredPath = _routePoints.isEmpty
+                                               ? [hotelPoint, scooterPoint]
+                                               : [..._routePoints.sublist(0, idx + 1), scooterPoint];
+                                           remainingPath = _routePoints.isEmpty
+                                               ? [scooterPoint, customerPoint]
+                                               : [scooterPoint, ..._routePoints.sublist(idx + 1)];
+                                         } else {
+                                           scooterPoint = _getScooterPosition(progress);
+                                           coveredPath = _routePoints.isEmpty
+                                               ? [hotelPoint, scooterPoint]
+                                               : [..._routePoints.sublist(0, _scooterSegmentIndex + 1), scooterPoint];
+                                           remainingPath = _routePoints.isEmpty
+                                               ? [scooterPoint, customerPoint]
+                                               : [scooterPoint, ..._routePoints.sublist(_scooterSegmentIndex + 1)];
+                                         }
 
-                                        // Covered road route path (solid royal blue)
-                                        final List<LatLng> coveredPath = _routePoints.isEmpty
-                                            ? [hotelPoint, scooterPoint]
-                                            : [..._routePoints.sublist(0, _scooterSegmentIndex + 1), scooterPoint];
-                                            
-                                        // Remaining road route path (solid light blue)
-                                        final List<LatLng> remainingPath = _routePoints.isEmpty
-                                            ? [scooterPoint, customerPoint]
-                                            : [scooterPoint, ..._routePoints.sublist(_scooterSegmentIndex + 1)];
+                                         // Calculate map center (midpoint)
+                                         final centerLat = (hotelPoint.latitude + customerPoint.latitude) / 2;
+                                         final centerLng = (hotelPoint.longitude + customerPoint.longitude) / 2;
+                                         final mapCenter = LatLng(centerLat, centerLng);
 
                                         return FlutterMap(
                                           options: MapOptions(
@@ -765,7 +814,7 @@ class _OrderStatusScreenState extends State<OrderStatusScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Bottom Card (Delivery Partner Rahul)
+                      // Bottom Card (Delivery Partner)
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
@@ -779,102 +828,172 @@ class _OrderStatusScreenState extends State<OrderStatusScreen> {
                             ),
                           ],
                         ),
-                        child: Column(
-                          children: [
-                            Row(
-                              children: [
-                                // Rahul avatar photo
-                                Container(
-                                  width: 44,
-                                  height: 44,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.grey.shade200,
-                                    image: DecorationImage(
-                                      image: NetworkImage(_orderDetails?.deliveryPartner.avatarUrl ?? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=200'),
-                                      fit: BoxFit.cover,
+                        child: _orderDetails?.deliveryPartner == null
+                            ? Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: const BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Color(0xFFEFF6FF),
+                                      ),
+                                      child: const Icon(
+                                        Icons.sports_motorsports_rounded,
+                                        color: Color(0xFF2563EB),
+                                        size: 24,
+                                      ),
                                     ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: const [
-                                      Text(
-                                        'Your Delivery Partner:',
-                                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey),
-                                      ),
-                                      SizedBox(height: 2),
-                                      Text(
-                                        'Rahul',
-                                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black87),
-                                      ),
-                                      SizedBox(height: 2),
-                                      Row(
-                                        children: [
-                                          Icon(Icons.star_rounded, color: Colors.amber, size: 13),
-                                          SizedBox(width: 2),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: const [
                                           Text(
-                                            '4.0',
-                                            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.black87),
+                                            'Awaiting Driver Assignment',
+                                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
+                                          ),
+                                          SizedBox(height: 2),
+                                          Text(
+                                            'We will assign a delivery partner shortly...',
+                                            style: TextStyle(fontSize: 11, color: Colors.grey),
                                           ),
                                         ],
                                       ),
+                                    ),
+                                    const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF2563EB)),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : Column(
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 44,
+                                        height: 44,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: Colors.grey.shade200,
+                                          image: DecorationImage(
+                                            image: NetworkImage(_orderDetails!.deliveryPartner!.avatarUrl.isNotEmpty
+                                                ? _orderDetails!.deliveryPartner!.avatarUrl
+                                                : 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?q=80&w=200'),
+                                            fit: BoxFit.cover,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            const Text(
+                                              'Your Delivery Partner:',
+                                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.grey),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              _orderDetails!.deliveryPartner!.name,
+                                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black87),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Row(
+                                              children: [
+                                                const Icon(Icons.star_rounded, color: Colors.amber, size: 13),
+                                                const SizedBox(width: 2),
+                                                Text(
+                                                  _orderDetails!.deliveryPartner!.rating,
+                                                  style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.black87),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Text(
+                                                  '•  ${_orderDetails!.deliveryPartner!.vehicleNumber}',
+                                                  style: const TextStyle(fontSize: 11.5, color: Colors.grey, fontWeight: FontWeight.w500),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ],
                                   ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            // Action buttons row
-                            Row(
-                              children: [
-                                Expanded(
-                                  flex: 2,
-                                  child: OutlinedButton(
-                                    style: OutlinedButton.styleFrom(
-                                      side: const BorderSide(color: Color(0xFF10B981), width: 1.5),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                    ),
-                                    onPressed: () {},
-                                    child: const Text('Call', style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 14)),
+                                  const SizedBox(height: 16),
+                                  // Action buttons row
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 2,
+                                        child: OutlinedButton(
+                                          style: OutlinedButton.styleFrom(
+                                            side: const BorderSide(color: Color(0xFF10B981), width: 1.5),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                            padding: const EdgeInsets.symmetric(vertical: 12),
+                                          ),
+                                          onPressed: () {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Calling ${_orderDetails!.deliveryPartner!.name}: ${_orderDetails!.deliveryPartner!.phoneNumber}'),
+                                                backgroundColor: const Color(0xFF10B981),
+                                              ),
+                                            );
+                                          },
+                                          child: const Text('Call', style: TextStyle(color: Color(0xFF10B981), fontWeight: FontWeight.bold, fontSize: 14)),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        flex: 2,
+                                        child: OutlinedButton(
+                                          style: OutlinedButton.styleFrom(
+                                            side: const BorderSide(color: Color(0xFFF97316), width: 1.5),
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                            padding: const EdgeInsets.symmetric(vertical: 12),
+                                          ),
+                                          onPressed: () {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Messaging ${_orderDetails!.deliveryPartner!.name}...'),
+                                                backgroundColor: const Color(0xFFF97316),
+                                              ),
+                                            );
+                                          },
+                                          child: const Text('Message', style: TextStyle(color: Color(0xFFF97316), fontWeight: FontWeight.bold, fontSize: 14)),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        flex: 3,
+                                        child: ElevatedButton.icon(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: const Color(0xFF2563EB),
+                                            foregroundColor: Colors.white,
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                            padding: const EdgeInsets.symmetric(vertical: 12),
+                                          ),
+                                          onPressed: () {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              const SnackBar(
+                                                content: Text('Redirecting to Help & Support...'),
+                                                backgroundColor: Color(0xFF2563EB),
+                                              ),
+                                            );
+                                          },
+                                          icon: const Icon(Icons.chat_bubble_outline_rounded, size: 15),
+                                          label: const Text('Help & Support', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  flex: 2,
-                                  child: OutlinedButton(
-                                    style: OutlinedButton.styleFrom(
-                                      side: const BorderSide(color: Color(0xFFF97316), width: 1.5),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                    ),
-                                    onPressed: () {},
-                                    child: const Text('Message', style: TextStyle(color: Color(0xFFF97316), fontWeight: FontWeight.bold, fontSize: 14)),
-                                  ),
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  flex: 3,
-                                  child: ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF2563EB),
-                                      foregroundColor: Colors.white,
-                                      elevation: 0,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                      padding: const EdgeInsets.symmetric(vertical: 12),
-                                    ),
-                                    onPressed: () {},
-                                    icon: const Icon(Icons.chat_bubble_outline_rounded, size: 15),
-                                    label: const Text('Help & Support', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+                                ],
+                              ),
                       ),
                     ],
                   ),

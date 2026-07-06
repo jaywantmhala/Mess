@@ -1,25 +1,28 @@
-// lib/screens/login_screen.dart
+// lib/screens/driver_signup_screen.dart
 import 'package:flutter/material.dart';
-import '../services/auth_service.dart';
+import '../services/driver_auth_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/app_button.dart';
 import '../widgets/app_text_field.dart';
-import 'home_shell.dart';
-import 'signup_screen.dart';
 import 'driver_login_screen.dart';
+import 'driver_home_shell.dart';
 
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class DriverSignupScreen extends StatefulWidget {
+  const DriverSignupScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<DriverSignupScreen> createState() => _DriverSignupScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen>
+class _DriverSignupScreenState extends State<DriverSignupScreen>
     with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
+  final _nameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _vehicleCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
+  final _confirmPasswordCtrl = TextEditingController();
 
   bool _obscurePassword = true;
   bool _isLoading = false;
@@ -44,18 +47,26 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   void dispose() {
     _entryCtrl.dispose();
+    _nameCtrl.dispose();
     _emailCtrl.dispose();
+    _phoneCtrl.dispose();
+    _vehicleCtrl.dispose();
     _passwordCtrl.dispose();
+    _confirmPasswordCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _handleLogin() async {
+  Future<void> _handleSignup() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _isLoading = true);
 
-    final res = await AuthService.instance.login(
+    final res = await DriverAuthService.instance.signUp(
+      fullName: _nameCtrl.text.trim(),
       email: _emailCtrl.text.trim(),
       password: _passwordCtrl.text,
+      confirmPassword: _confirmPasswordCtrl.text,
+      vehicleNumber: _vehicleCtrl.text.trim(),
+      phoneNumber: _phoneCtrl.text.trim(),
     );
 
     if (!mounted) return;
@@ -65,7 +76,7 @@ class _LoginScreenState extends State<LoginScreen>
       Navigator.pushAndRemoveUntil(
         context,
         PageRouteBuilder(
-          pageBuilder: (_, anim, __) => const HomeShell(),
+          pageBuilder: (_, anim, __) => const DriverHomeShell(),
           transitionDuration: const Duration(milliseconds: 400),
           transitionsBuilder: (_, anim, __, child) => FadeTransition(
             opacity: anim,
@@ -97,7 +108,7 @@ class _LoginScreenState extends State<LoginScreen>
                   color: AppColors.error, size: 20),
             ),
             const SizedBox(width: 12),
-            const Text('Login Failed',
+            const Text('Driver Sign Up Failed',
                 style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
@@ -142,13 +153,31 @@ class _LoginScreenState extends State<LoginScreen>
           SafeArea(
             child: Column(
               children: [
-                // Back button row
                 Padding(
                   padding:
                       EdgeInsets.symmetric(horizontal: hPad - 8, vertical: 4),
                   child: Row(
                     children: [
-                      _BackButton(),
+                      Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(14),
+                          onTap: () => Navigator.pop(context),
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceElevated,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(
+                              Icons.arrow_back_ios_new_rounded,
+                              size: 18,
+                              color: AppColors.ink,
+                            ),
+                          ),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -170,7 +199,6 @@ class _LoginScreenState extends State<LoginScreen>
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // ── Header ──────────────────────────
                                   Container(
                                     width: 52,
                                     height: 52,
@@ -181,83 +209,114 @@ class _LoginScreenState extends State<LoginScreen>
                                       boxShadow: AppShadows.elevated,
                                     ),
                                     child: const Icon(
-                                      Icons.lock_open_rounded,
+                                      Icons.person_add_alt_1_rounded,
                                       color: Colors.white,
                                       size: 26,
                                     ),
                                   ),
                                   const SizedBox(height: 20),
-                                  Text('Welcome\nBack!',
+                                  Text('Driver\nRegister',
                                       style: AppText.displayMedium),
                                   const SizedBox(height: 10),
                                   Text(
-                                    'Sign in to access your vendor dashboard.',
+                                    'Create a new driver account to start delivering.',
                                     style: AppText.bodyMedium,
                                   ),
                                   const SizedBox(height: 36),
 
-                                  // ── Email ────────────────────────────
                                   AppTextField(
-                                    controller: _emailCtrl,
-                                    label: 'Email Address',
-                                    hint: 'name@example.com',
-                                    icon: Icons.email_outlined,
-                                    keyboardType:
-                                        TextInputType.emailAddress,
-                                    textInputAction:
-                                        TextInputAction.next,
+                                    controller: _nameCtrl,
+                                    label: 'Full Name',
+                                    hint: 'John Doe',
+                                    icon: Icons.person_outline_rounded,
+                                    textInputAction: TextInputAction.next,
                                     validator: (v) {
-                                      if (v == null || v.isEmpty)
-                                        return 'Email is required';
-                                      if (!RegExp(
-                                              r'^[^@]+@[^@]+\.[^@]+')
-                                          .hasMatch(v))
-                                        return 'Enter a valid email';
+                                      if (v == null || v.isEmpty) return 'Full name is required';
                                       return null;
                                     },
                                   ),
                                   const SizedBox(height: 20),
 
-                                  // ── Password ─────────────────────────
+                                  AppTextField(
+                                    controller: _emailCtrl,
+                                    label: 'Email Address',
+                                    hint: 'driver@example.com',
+                                    icon: Icons.email_outlined,
+                                    keyboardType: TextInputType.emailAddress,
+                                    textInputAction: TextInputAction.next,
+                                    validator: (v) {
+                                      if (v == null || v.isEmpty) return 'Email is required';
+                                      if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(v)) return 'Enter a valid email';
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 20),
+
+                                  AppTextField(
+                                    controller: _phoneCtrl,
+                                    label: 'Phone Number',
+                                    hint: 'e.g. +919876543210',
+                                    icon: Icons.phone_outlined,
+                                    keyboardType: TextInputType.phone,
+                                    textInputAction: TextInputAction.next,
+                                    validator: (v) {
+                                      if (v == null || v.isEmpty) return 'Phone number is required';
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 20),
+
+                                  AppTextField(
+                                    controller: _vehicleCtrl,
+                                    label: 'Vehicle Number',
+                                    hint: 'e.g. MH-12-AB-1234',
+                                    icon: Icons.motorcycle_rounded,
+                                    textInputAction: TextInputAction.next,
+                                    validator: (v) {
+                                      if (v == null || v.isEmpty) return 'Vehicle number is required';
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 20),
+
                                   AppTextField(
                                     controller: _passwordCtrl,
                                     label: 'Password',
-                                    hint: 'Enter your password',
+                                    hint: 'At least 8 characters with letter & number',
                                     icon: Icons.lock_outline_rounded,
                                     obscureText: _obscurePassword,
-                                    textInputAction:
-                                        TextInputAction.done,
-                                    suffixWidget: IconButton(
-                                      icon: Icon(
-                                        _obscurePassword
-                                            ? Icons.visibility_off_outlined
-                                            : Icons.visibility_outlined,
-                                        color: AppColors.textHint,
-                                        size: 20,
-                                      ),
-                                      onPressed: () => setState(() =>
-                                          _obscurePassword =
-                                              !_obscurePassword),
-                                    ),
+                                    textInputAction: TextInputAction.next,
                                     validator: (v) {
-                                      if (v == null || v.isEmpty)
-                                        return 'Password is required';
+                                      if (v == null || v.isEmpty) return 'Password is required';
+                                      if (v.length < 8) return 'Must be at least 8 characters';
+                                      return null;
+                                    },
+                                  ),
+                                  const SizedBox(height: 20),
+
+                                  AppTextField(
+                                    controller: _confirmPasswordCtrl,
+                                    label: 'Confirm Password',
+                                    hint: 'Re-enter your password',
+                                    icon: Icons.lock_outline_rounded,
+                                    obscureText: _obscurePassword,
+                                    textInputAction: TextInputAction.done,
+                                    validator: (v) {
+                                      if (v == null || v.isEmpty) return 'Please confirm password';
+                                      if (v != _passwordCtrl.text) return 'Passwords do not match';
                                       return null;
                                     },
                                   ),
                                   const SizedBox(height: 36),
 
-                                  // ── Login Button ─────────────────────
                                   AppPrimaryButton(
-                                    label: 'Sign In',
-                                    icon: Icons.login_rounded,
+                                    label: 'Create Driver Account',
+                                    icon: Icons.person_add_rounded,
                                     isLoading: _isLoading,
-                                    onPressed:
-                                        _isLoading ? null : _handleLogin,
+                                    onPressed: _isLoading ? null : _handleSignup,
                                   ),
                                   const SizedBox(height: 24),
 
-                                  // ── Switch to Register ───────────────
                                   Center(
                                     child: GestureDetector(
                                       onTap: () =>
@@ -265,56 +324,23 @@ class _LoginScreenState extends State<LoginScreen>
                                         context,
                                         MaterialPageRoute(
                                             builder: (_) =>
-                                                const SignupScreen()),
+                                                const DriverLoginScreen()),
                                       ),
                                       child: RichText(
                                         text: TextSpan(
-                                          text:
-                                              "Don't have an account?  ",
-                                          style: AppText.bodyMedium
-                                              .copyWith(fontSize: 14),
+                                          text: "Already have a driver account?  ",
+                                          style: AppText.bodyMedium.copyWith(fontSize: 14),
                                           children: const [
                                             TextSpan(
-                                              text: 'Register',
+                                              text: 'Login',
                                               style: TextStyle(
                                                 color: AppColors.primary,
-                                                fontWeight:
-                                                    FontWeight.w700,
-                                                decoration: TextDecoration
-                                                    .underline,
-                                                decorationColor:
-                                                    AppColors.primary,
+                                                fontWeight: FontWeight.w700,
+                                                decoration: TextDecoration.underline,
+                                                decorationColor: AppColors.primary,
                                               ),
                                             ),
                                           ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 24),
-                                  Center(
-                                    child: OutlinedButton.icon(
-                                      onPressed: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (_) => const DriverLoginScreen(),
-                                          ),
-                                        );
-                                      },
-                                      icon: const Icon(Icons.delivery_dining_rounded, color: AppColors.primary),
-                                      label: const Text(
-                                        'Continue as Driver',
-                                        style: TextStyle(
-                                          color: AppColors.primary,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      style: OutlinedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                                        side: const BorderSide(color: AppColors.primary, width: 1.5),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(16),
                                         ),
                                       ),
                                     ),
@@ -333,32 +359,6 @@ class _LoginScreenState extends State<LoginScreen>
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _BackButton extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () => Navigator.maybePop(context),
-        child: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: AppColors.surfaceElevated,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: const Icon(
-            Icons.arrow_back_ios_new_rounded,
-            size: 18,
-            color: AppColors.ink,
-          ),
-        ),
       ),
     );
   }

@@ -110,21 +110,36 @@ class OrderDetailsHotel {
 }
 
 class OrderDetailsDeliveryPartner {
+  final int id;
   final String name;
   final String rating;
   final String avatarUrl;
+  final String phoneNumber;
+  final String vehicleNumber;
+  double latitude;
+  double longitude;
 
-  const OrderDetailsDeliveryPartner({
+  OrderDetailsDeliveryPartner({
+    required this.id,
     required this.name,
     required this.rating,
     required this.avatarUrl,
+    required this.phoneNumber,
+    required this.vehicleNumber,
+    required this.latitude,
+    required this.longitude,
   });
 
   factory OrderDetailsDeliveryPartner.fromJson(Map<String, dynamic> json) =>
       OrderDetailsDeliveryPartner(
+        id: int.tryParse(json['id'].toString()) ?? 0,
         name: json['name'] as String? ?? '',
         rating: json['rating'] as String? ?? '4.0',
         avatarUrl: json['avatar_url'] as String? ?? '',
+        phoneNumber: json['phone_number'] as String? ?? '',
+        vehicleNumber: json['vehicle_number'] as String? ?? '',
+        latitude: double.tryParse((json['latitude'] ?? 0.0).toString()) ?? 0.0,
+        longitude: double.tryParse((json['longitude'] ?? 0.0).toString()) ?? 0.0,
       );
 }
 
@@ -141,7 +156,7 @@ class OrderDetails {
   final String createdAt;
   final OrderDetailsHotel hotel;
   final List<OrderDetailsItem> items;
-  final OrderDetailsDeliveryPartner deliveryPartner;
+  final OrderDetailsDeliveryPartner? deliveryPartner;
   final double customerLatitude;
   final double customerLongitude;
 
@@ -158,7 +173,7 @@ class OrderDetails {
     required this.createdAt,
     required this.hotel,
     required this.items,
-    required this.deliveryPartner,
+    this.deliveryPartner,
     required this.customerLatitude,
     required this.customerLongitude,
   });
@@ -180,8 +195,9 @@ class OrderDetails {
       items: (json['items'] as List)
           .map((item) => OrderDetailsItem.fromJson(item as Map<String, dynamic>))
           .toList(),
-      deliveryPartner: OrderDetailsDeliveryPartner.fromJson(
-          json['delivery_partner'] as Map<String, dynamic>),
+      deliveryPartner: json['delivery_partner'] != null
+          ? OrderDetailsDeliveryPartner.fromJson(json['delivery_partner'] as Map<String, dynamic>)
+          : null,
       customerLatitude: double.parse((customer?['latitude'] ?? 18.5204).toString()),
       customerLongitude: double.parse((customer?['longitude'] ?? 73.8567).toString()),
     );

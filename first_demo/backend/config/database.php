@@ -272,4 +272,33 @@ function createTables(PDO $pdo): void {
     try {
         $pdo->exec("ALTER TABLE `orders` ALTER COLUMN `status` SET DEFAULT 'created_order'");
     } catch (PDOException $e) {}
+
+    // Create drivers table
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `drivers` (
+            `id`              INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+            `full_name`       VARCHAR(150)  NOT NULL,
+            `email`           VARCHAR(255)  NOT NULL,
+            `password`        VARCHAR(255)  NOT NULL,
+            `vehicle_number`  VARCHAR(50)   NOT NULL,
+            `phone_number`    VARCHAR(20)   NOT NULL,
+            `is_online`       TINYINT(1)    NOT NULL DEFAULT 0,
+            `latitude`        DECIMAL(10,8) NOT NULL DEFAULT 18.5204,
+            `longitude`       DECIMAL(11,8) NOT NULL DEFAULT 73.8567,
+            `max_capacity`    INT           NOT NULL DEFAULT 3,
+            `created_at`      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `updated_at`      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `uq_driver_email` (`email`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+
+    // Add driver_id column and foreign key to orders table
+    try {
+        $pdo->exec("ALTER TABLE `orders` ADD COLUMN `driver_id` INT UNSIGNED DEFAULT NULL");
+    } catch (PDOException $e) {}
+
+    try {
+        $pdo->exec("ALTER TABLE `orders` ADD CONSTRAINT `fk_order_driver` FOREIGN KEY (`driver_id`) REFERENCES `drivers` (`id`) ON DELETE SET NULL");
+    } catch (PDOException $e) {}
 }

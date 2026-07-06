@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'auth_service.dart';
+import 'driver_auth_service.dart';
 import '../utils/app_config.dart';
 
 class WebSocketService {
@@ -34,8 +35,11 @@ class WebSocketService {
     _shouldReconnect = true;
 
     try {
-      final token = await AuthService.instance.getSavedToken();
-      if (token == null) {
+      String? token = await AuthService.instance.getSavedToken();
+      if (token == null || token.isEmpty) {
+        token = await DriverAuthService.instance.getSavedToken();
+      }
+      if (token == null || token.isEmpty) {
         debugPrint('WebSocket: No token found. Skipping connection.');
         _isConnecting = false;
         return;
@@ -84,7 +88,7 @@ class WebSocketService {
 
       // Handle custom events
       final event = data['event'] as String?;
-      if (event == 'NEW_ORDER') {
+      if (event == 'NEW_ORDER' || event == 'ORDER_ASSIGNED') {
         // Automatically play the danger notification sound!
         _playAlertSound();
       }
@@ -179,5 +183,22 @@ class WebSocketService {
     _reconnectTimer?.cancel();
     _cleanupChannel();
     debugPrint('WebSocket: Manually disconnected.');
+  }
+
+  void sendLocationUpdate(double lat, double lng) {
+    if (_channel != null) {
+      try {
+        _channel!.sink.add(jsonEncode({
+          'event': 'UPDATE_LOCATION',
+          'data': {
+            'latitude': lat,
+            'longitude': lng,
+          }
+        }));
+        debugPrint('WebSocket: Transmitted driver coordinates ($lat, $lng)');
+      } catch (e) {
+        debugPrint('WebSocket: Failed to transmit driver coordinates: $e');
+      }
+    }
   }
 }

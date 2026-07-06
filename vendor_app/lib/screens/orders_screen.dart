@@ -99,7 +99,7 @@ class _OrdersScreenState extends State<OrdersScreen> with AutomaticKeepAliveClie
     });
   }
 
-  Future<void> _updateStatus(int orderId, String newStatus) async {
+  Future<bool> _updateStatus(int orderId, String newStatus) async {
     // Show loading indicator
     showDialog(
       context: context,
@@ -144,6 +144,7 @@ class _OrdersScreenState extends State<OrdersScreen> with AutomaticKeepAliveClie
         );
       }
     }
+    return success;
   }
 
   Color _getStatusBgColor(String status) {
@@ -603,7 +604,12 @@ class _OrdersScreenState extends State<OrdersScreen> with AutomaticKeepAliveClie
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   elevation: 0,
                 ),
-                onPressed: () => _updateStatus(order.orderId, 'ready'),
+                onPressed: () async {
+                  final ok = await _updateStatus(order.orderId, 'ready');
+                  if (ok && mounted) {
+                    _showDriverAssignmentSheet(order.orderId);
+                  }
+                },
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: const [
@@ -619,30 +625,298 @@ class _OrdersScreenState extends State<OrdersScreen> with AutomaticKeepAliveClie
             ),
 
           // ── Case 4: READY ──────────────────────────────────────────────────
-          if (order.status == 'ready')
+          if (order.status == 'ready') ...[
             Expanded(
-              child: ElevatedButton(
+              child: ElevatedButton.icon(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.success,
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   elevation: 0,
                 ),
+                onPressed: () => _showDriverAssignmentSheet(order.orderId),
+                icon: const Icon(Icons.person_add_rounded, size: 16),
+                label: const Text(
+                  'ASSIGN DRIVER',
+                  style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.5),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.success,
+                  side: const BorderSide(color: AppColors.success, width: 1.2),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
                 onPressed: () => _updateStatus(order.orderId, 'completed'),
+                child: const Text(
+                  'COMPLETE MANUALLY',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+            ),
+          ],
+
+          // ── Case 5: DRIVER ACTIVE DELIVERIES ──────────────────────────────
+          if (order.status == 'assigned' || order.status == 'accepted_by_driver' || order.status == 'picked_up')
+            Expanded(
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(Icons.directions_run_rounded, size: 16),
-                    SizedBox(width: 8),
+                  children: [
+                    const Icon(Icons.delivery_dining_rounded, color: AppColors.primary, size: 18),
+                    const SizedBox(width: 8),
                     Text(
-                      'COMPLETE DELIVERY',
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, letterSpacing: 0.5),
+                      order.status == 'assigned'
+                          ? 'AWAITING DRIVER ACCEPTANCE'
+                          : order.status == 'accepted_by_driver'
+                              ? 'DRIVER HEADING TO HOTEL'
+                              : 'DRIVER DELIVERING ORDER',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showDriverAssignmentSheet(int orderId) async {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 480),
+            child: _DriverAssignmentSheetContent(
+              orderId: orderId,
+              onAssigned: () {
+                _loadOrders();
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _DriverAssignmentSheetContent extends StatefulWidget {
+  final int orderId;
+  final VoidCallback onAssigned;
+
+  const _DriverAssignmentSheetContent({
+    required this.orderId,
+    required this.onAssigned,
+  });
+
+  @override
+  State<_DriverAssignmentSheetContent> createState() => _DriverAssignmentSheetContentState();
+}
+
+class _DriverAssignmentSheetContentState extends State<_DriverAssignmentSheetContent> {
+  bool _isLoading = true;
+  List<DriverOnline> _drivers = [];
+  int? _assigningDriverId;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchDrivers();
+  }
+
+  Future<void> _fetchDrivers() async {
+    final list = await OrderService.instance.getOnlineDrivers();
+    if (mounted) {
+      setState(() {
+        _drivers = list;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _assignDriver(int driverId) async {
+    setState(() => _assigningDriverId = driverId);
+    final success = await OrderService.instance.assignDriver(widget.orderId, driverId);
+    if (!mounted) return;
+    
+    setState(() => _assigningDriverId = null);
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Order successfully assigned to driver!'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+      widget.onAssigned();
+      Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to assign driver. Please try again.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Build driver list items as plain widgets (no ListView inside dialog)
+    Widget body;
+    if (_isLoading) {
+      body = const Padding(
+        padding: EdgeInsets.symmetric(vertical: 32.0),
+        child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      );
+    } else if (_drivers.isEmpty) {
+      body = const Padding(
+        padding: EdgeInsets.symmetric(vertical: 24.0),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.sports_motorsports_outlined, size: 48, color: AppColors.textHint),
+            SizedBox(height: 12),
+            Text(
+              'No available drivers online right now.',
+              style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Toggle a driver account online or complete manually.',
+              style: TextStyle(fontSize: 12, color: AppColors.textHint),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    } else {
+      // Build each driver card as a Column child — no ListView needed
+      final cards = <Widget>[];
+      for (int i = 0; i < _drivers.length; i++) {
+        final d = _drivers[i];
+        final isAssigning = _assigningDriverId == d.id;
+        cards.add(
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.grey.shade200),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.08),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.sports_motorsports_rounded, color: AppColors.primary),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        d.fullName,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.ink),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Vehicle: ${d.vehicleNumber}',
+                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Active Tasks: ${d.activeOrderCount}/${d.maxCapacity}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: d.activeOrderCount >= d.maxCapacity ? AppColors.error : AppColors.success,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    minimumSize: const Size(70, 36),
+                  ),
+                  onPressed: isAssigning ? null : () => _assignDriver(d.id),
+                  child: isAssigning
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Text('Assign', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+      body = SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: cards,
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  'Assign Driver — Order #${widget.orderId}',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.ink),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, color: AppColors.textHint),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+          const Divider(height: 20),
+          body,
         ],
       ),
     );

@@ -207,6 +207,22 @@ while (true) {
                             }
                         }
                     }
+                    elseif ($event === 'ORDER_ASSIGNED') {
+                        $orderId = (int)($eventData['order_id'] ?? 0);
+                        $driverId = (int)($eventData['driver_id'] ?? 0);
+                        echo "Broadcasting ORDER_ASSIGNED for order #$orderId to driver #$driverId\n";
+                        
+                        foreach ($socket_metadata as $sid => $meta) {
+                            if ($meta['role'] === 'driver' && $meta['id'] === $driverId) {
+                                $driver_socket = $sockets[array_search($sid, array_map('intval', $sockets))];
+                                if ($driver_socket) {
+                                    $msg = json_encode(['event' => 'ORDER_ASSIGNED', 'data' => $eventData]);
+                                    @fwrite($driver_socket, encodeFrame($msg));
+                                    echo "Pushed ORDER_ASSIGNED to driver socket #$sid\n";
+                                }
+                            }
+                        }
+                    }
                 }
                 
                 // Immediately close connection with local system client
@@ -289,9 +305,49 @@ while (true) {
             
             $msg = json_decode($text, true);
             if (json_last_error() === JSON_ERROR_NONE) {
-                // Heartbeat ping-pong
                 if (isset($msg['type']) && $msg['type'] === 'ping') {
                     @fwrite($client, encodeFrame(json_encode(['type' => 'pong'])));
+                }
+                elseif (isset($msg['event']) && $msg['event'] === 'UPDATE_LOCATION') {
+                    $meta = $socket_metadata[$client_id];
+                    if ($meta['authenticated'] && $meta['role'] === 'driver') {
+                        $driverId = $meta['id'];
+                        $lat = (float)($msg['data']['latitude'] ?? 0.0);
+                        $lng = (float)($msg['data']['longitude'] ?? 0.0);
+                        
+                        echo "Received location from driver #$driverId: ($lat, $lng)\n";
+                        
+                        $db = getWSDBConnection();
+                        if ($db) {
+                            $stmt = $db->prepare("UPDATE drivers SET latitude = ?, longitude = ? WHERE id = ?");
+                            $stmt->execute([$lat, $lng, $driverId]);
+                            
+                            $stmt = $db->prepare("SELECT DISTINCT customer_id FROM orders WHERE driver_id = ? AND status IN ('assigned', 'accepted_by_driver', 'picked_up')");
+                            $stmt->execute([$driverId]);
+                            $customerIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
+                            
+                            if (!empty($customerIds)) {
+                                $payload = json_encode([
+                                    'event' => 'DRIVER_LOCATION_UPDATED',
+                                    'data' => [
+                                        'driver_id' => $driverId,
+                                        'latitude' => $lat,
+                                        'longitude' => $lng
+                                    ]
+                                ]);
+                                $frame = encodeFrame($payload);
+                                
+                                foreach ($socket_metadata as $sid => $smeta) {
+                                    if ($smeta['role'] === 'customer' && in_array((int)$smeta['id'], $customerIds)) {
+                                        $cust_socket = $sockets[array_search($sid, array_map('intval', $sockets))];
+                                        if ($cust_socket) {
+                                            @fwrite($cust_socket, $frame);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -52,7 +52,7 @@ $mappedItems = array_map(function($item) {
         'id' => $item['id'],
         'name' => $item['food_name'],
         'description' => $item['description'],
-        'price' => (double)$item['price'],
+        'price' => (float)$item['price'],
         'originalPrice' => null, // Optional feature not in DB yet
         'isVeg' => strtoupper($item['food_type']) === 'VEG',
         'isSpicy' => strtoupper($item['spice_level']) !== 'NONE',

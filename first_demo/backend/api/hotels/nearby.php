@@ -101,9 +101,9 @@ try {
     
     // Format distance values to floats for precision
     foreach ($hotels as &$hotel) {
-        $hotel['distance'] = (double)$hotel['distance'];
-        $hotel['latitude'] = (double)$hotel['latitude'];
-        $hotel['longitude'] = (double)$hotel['longitude'];
+        $hotel['distance'] = (float)$hotel['distance'];
+        $hotel['latitude'] = (float)$hotel['latitude'];
+        $hotel['longitude'] = (float)$hotel['longitude'];
     }
     unset($hotel);
 

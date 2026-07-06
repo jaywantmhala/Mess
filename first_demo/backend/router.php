@@ -34,6 +34,16 @@ $routes = [
     'POST /api/vendor/menu/delete'  => __DIR__ . '/api/vendor/menu/delete.php',
     'GET  /api/vendor/orders'        => __DIR__ . '/api/vendor/orders/list.php',
     'POST /api/vendor/orders/status' => __DIR__ . '/api/vendor/orders/status.php',
+    'GET  /api/vendor/drivers/online' => __DIR__ . '/api/vendor/drivers/online.php',
+    'POST /api/vendor/orders/assign'  => __DIR__ . '/api/vendor/orders/assign.php',
+
+    // ── Driver ────────────────────────────────────────────────────────────
+    'POST /api/driver/signup'        => __DIR__ . '/api/driver/signup.php',
+    'POST /api/driver/login'         => __DIR__ . '/api/driver/login.php',
+    'GET  /api/driver/me'            => __DIR__ . '/api/driver/me.php',
+    'POST /api/driver/status'        => __DIR__ . '/api/driver/status.php',
+    'GET  /api/driver/orders'        => __DIR__ . '/api/driver/orders/list.php',
+    'POST /api/driver/orders/status' => __DIR__ . '/api/driver/orders/status.php',
 
     // ── Hotels (public) ───────────────────────────────────────────────────
     'GET  /api/hotels/nearby' => __DIR__ . '/api/hotels/nearby.php',

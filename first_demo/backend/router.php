@@ -53,6 +53,7 @@ $routes = [
     // ── Orders ────────────────────────────────────────────────────────────
     'POST /api/orders/place'   => __DIR__ . '/api/orders/place.php',
     'GET  /api/orders/history' => __DIR__ . '/api/orders/history.php',
+    'GET  /api/orders/details' => __DIR__ . '/api/orders/details.php',
 ];
 
 foreach ($routes as $pattern => $file) {

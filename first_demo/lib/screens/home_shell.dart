@@ -128,13 +128,13 @@ class _HomeShellState extends State<HomeShell>
         final screenW = mediaQuery.size.width;
         final screenH = mediaQuery.size.height;
         
-        final double defaultX = screenW - 170.0;
+        final double defaultX = screenW - 190.0;
         final double defaultY = screenH - 180.0;
 
         _dragX ??= defaultX;
         _dragY ??= defaultY;
 
-        _dragX = _dragX!.clamp(16.0, screenW - 170.0);
+        _dragX = _dragX!.clamp(16.0, screenW - 190.0);
         _dragY = _dragY!.clamp(80.0, screenH - 180.0);
 
         return Positioned(
@@ -143,7 +143,7 @@ class _HomeShellState extends State<HomeShell>
           child: GestureDetector(
             onPanUpdate: (details) {
               setState(() {
-                _dragX = (_dragX! + details.delta.dx).clamp(16.0, screenW - 170.0);
+                _dragX = (_dragX! + details.delta.dx).clamp(16.0, screenW - 190.0);
                 _dragY = (_dragY! + details.delta.dy).clamp(80.0, screenH - 180.0);
               });
             },
@@ -155,76 +155,88 @@ class _HomeShellState extends State<HomeShell>
                 ),
               );
             },
-            child: MouseRegion(
-              cursor: SystemMouseCursors.grab,
-              child: Container(
-                width: 155,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF1E1E2E), Color(0xFF2D2D3E)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+            child: Container(
+              width: 175,
+              decoration: BoxDecoration(
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF1E355A).withOpacity(0.3),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                    spreadRadius: 1,
                   ),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFFF07070).withOpacity(0.8), width: 1.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFF07070).withOpacity(0.2),
-                      blurRadius: 12,
-                      spreadRadius: 2,
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(22),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1D2E4E).withOpacity(0.96),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: const Color(0xFFFFD700).withOpacity(0.4),
+                      width: 1.5,
                     ),
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _buildPulsingIndicator(activeOrder.status),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'TRACK ORDER',
-                            style: TextStyle(
-                              color: Color(0xFFF07070),
-                              fontSize: 9,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: 0.8,
+                  ),
+                  child: Row(
+                    children: [
+                      _buildPulsingIndicator(activeOrder.status),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Icon(Icons.radar, size: 10, color: Color(0xFFFFD700)),
+                                SizedBox(width: 3),
+                                Text(
+                                  'LIVE TRACKING',
+                                  style: TextStyle(
+                                    color: Color(0xFFFFD700),
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.w900,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            activeOrder.hotelName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
+                            const SizedBox(height: 3),
+                            Text(
+                              activeOrder.hotelName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 1),
-                          Text(
-                            _getShortStatusText(activeOrder.status),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 10,
+                            const SizedBox(height: 2),
+                            Text(
+                              _getShortStatusText(activeOrder.status),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: Colors.greenAccent.shade400,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.chevron_right_rounded,
+                        color: Colors.white70,
+                        size: 18,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -257,15 +269,19 @@ class _HomeShellState extends State<HomeShell>
     }
 
     return Container(
-      padding: const EdgeInsets.all(6),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withOpacity(0.18),
         shape: BoxShape.circle,
+        border: Border.all(
+          color: color.withOpacity(0.4),
+          width: 1,
+        ),
       ),
       child: Icon(
         icon,
         color: color,
-        size: 18,
+        size: 16,
       ),
     );
   }

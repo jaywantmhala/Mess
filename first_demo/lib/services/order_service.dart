@@ -83,4 +83,25 @@ class OrderService {
       return [];
     }
   }
+
+  /// Returns detailed information for a single order.
+  Future<OrderDetails> getDetails({required int orderId}) async {
+    final headers = await _authHeaders();
+    try {
+      final response = await http
+          .get(
+            Uri.parse('$kBaseUrl/api/orders/details?order_id=$orderId'),
+            headers: headers,
+          )
+          .timeout(_kOrderTimeout);
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (body['success'] == true && body['data'] != null) {
+        return OrderDetails.fromJson(body['data'] as Map<String, dynamic>);
+      }
+      throw Exception(body['message'] ?? 'Failed to get order details');
+    } catch (e) {
+      throw Exception('Failed to load order details: $e');
+    }
+  }
 }

@@ -35,10 +35,10 @@ if ($hotelId <= 0) { sendError('Hotel ID is required.', 422); }
 // ── Database ──────────────────────────────────────────────────────────────────
 $pdo = getDBConnection();
 
-// Fetch all menu items for the specific hotel
+// Fetch menu items for the specific hotel for today
 $stmt = $pdo->prepare("
     SELECT * FROM menus 
-    WHERE hotel_id = :hotel_id
+    WHERE hotel_id = :hotel_id AND menu_date = CURDATE()
     ORDER BY created_at DESC
 ");
 $stmt->execute([

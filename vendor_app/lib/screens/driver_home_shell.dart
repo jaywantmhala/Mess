@@ -1,5 +1,6 @@
 // lib/screens/driver_home_shell.dart
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'driver_dashboard_tab.dart';
@@ -101,47 +102,61 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
 
     _assignmentOverlay = OverlayEntry(
       builder: (context) {
-        return Positioned(
-          top: MediaQuery.of(context).padding.top + 12,
-          left: 16,
-          right: 16,
-          child: Material(
-            color: Colors.transparent,
-            child: _DriverNotificationOverlayContent(
-              orderId: orderId,
-              hotelName: hotelName,
-              grandTotal: grandTotal,
-              onClose: () {
-                WebSocketService.instance.stopAlertSound();
-                _assignmentOverlay?.remove();
-                _assignmentOverlay = null;
-              },
-              onReject: () async {
-                WebSocketService.instance.stopAlertSound();
-                _assignmentOverlay?.remove();
-                _assignmentOverlay = null;
-                // Reject the order
-                await DriverOrderService.instance.updateOrderStatus(
-                  orderId: orderId,
-                  status: 'rejected_by_driver',
-                );
-                // Refresh orders tab
-                _ordersTabKey.currentState?.reload();
-              },
-              onAccept: () async {
-                WebSocketService.instance.stopAlertSound();
-                _assignmentOverlay?.remove();
-                _assignmentOverlay = null;
-                // Accept the order
-                await DriverOrderService.instance.updateOrderStatus(
-                  orderId: orderId,
-                  status: 'accepted_by_driver',
-                );
-                // Refresh orders tab first, then navigate there
-                _ordersTabKey.currentState?.reload();
-                _onTabSelected(1); // Navigate to Orders Tab
-              },
-            ),
+        return Positioned.fill(
+          child: Stack(
+            children: [
+              // Full-screen blurred backdrop
+              BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                child: Container(
+                  color: Colors.black.withOpacity(0.55),
+                ),
+              ),
+              // Centered Popup Card
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: _DriverNotificationOverlayContent(
+                      orderId: orderId,
+                      hotelName: hotelName,
+                      grandTotal: grandTotal,
+                      onClose: () {
+                        WebSocketService.instance.stopAlertSound();
+                        _assignmentOverlay?.remove();
+                        _assignmentOverlay = null;
+                      },
+                      onReject: () async {
+                        WebSocketService.instance.stopAlertSound();
+                        _assignmentOverlay?.remove();
+                        _assignmentOverlay = null;
+                        // Reject the order
+                        await DriverOrderService.instance.updateOrderStatus(
+                          orderId: orderId,
+                          status: 'rejected_by_driver',
+                        );
+                        // Refresh orders tab
+                        _ordersTabKey.currentState?.reload();
+                      },
+                      onAccept: () async {
+                        WebSocketService.instance.stopAlertSound();
+                        _assignmentOverlay?.remove();
+                        _assignmentOverlay = null;
+                        // Accept the order
+                        await DriverOrderService.instance.updateOrderStatus(
+                          orderId: orderId,
+                          status: 'accepted_by_driver',
+                        );
+                        // Refresh orders tab first, then navigate there
+                        _ordersTabKey.currentState?.reload();
+                        _onTabSelected(1); // Navigate to Orders Tab
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -294,207 +309,344 @@ class _DriverNotificationOverlayContent extends StatefulWidget {
 
 class _DriverNotificationOverlayContentState
     extends State<_DriverNotificationOverlayContent>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   bool _isAccepting = false;
   bool _isRejecting = false;
 
-  // Pulse animation for the delivery icon
+  late AnimationController _entryController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _fadeAnimation;
+
   late AnimationController _pulseController;
-  late Animation<double> _pulseAnim;
+  late Animation<double> _pulseAnimation;
+
+  late AnimationController _timerController;
 
   @override
   void initState() {
     super.initState();
+    // Entry animations
+    _entryController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+    _scaleAnimation = CurvedAnimation(
+      parent: _entryController,
+      curve: Curves.easeOutBack,
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _entryController,
+      curve: Curves.easeOut,
+    );
+    _entryController.forward();
+
+    // Pulse animation
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 1000),
     )..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 0.85, end: 1.15).animate(
+    _pulseAnimation = Tween<double>(begin: 0.9, end: 1.1).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+
+    // Draining timer animation (30 seconds)
+    _timerController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 30),
+    )..forward();
   }
 
   @override
   void dispose() {
+    _entryController.dispose();
     _pulseController.dispose();
+    _timerController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF1E1E2E),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.primary.withOpacity(0.6), width: 1.8),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withOpacity(0.25),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: ScaleTransition(
+        scale: _scaleAnimation,
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 340),
+          decoration: BoxDecoration(
+            color: const Color(0xFF151522), // Premium dark theme
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.08),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withOpacity(0.18),
+                blurRadius: 36,
+                offset: const Offset(0, 12),
+              ),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 16,
+                spreadRadius: -4,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
-          BoxShadow(
-            color: Colors.black.withOpacity(0.4),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(18),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Header ────────────────────────────────────────────────────────
-          Row(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              ScaleTransition(
-                scale: _pulseAnim,
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.18),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.delivery_dining_rounded,
-                    color: AppColors.primary,
-                    size: 24,
+              // Pulsing Icon Header
+              Center(
+                child: ScaleTransition(
+                  scale: _pulseAnimation,
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.primary.withOpacity(0.3),
+                        width: 2,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.delivery_dining_rounded,
+                      color: AppColors.primary,
+                      size: 28,
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      '🔔 NEW DELIVERY ASSIGNED!',
-                      style: TextStyle(
-                        color: AppColors.primaryLight,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: 1.0,
+              const SizedBox(height: 16),
+
+              // Spaced Badge Title
+              const Text(
+                'NEW DELIVERY ASSIGNED',
+                style: TextStyle(
+                  color: AppColors.primaryLight,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.5,
+                ),
+              ),
+              const SizedBox(height: 4),
+
+              // Order Number
+              Text(
+                'Order #${widget.orderId}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 2),
+
+              // Hotel Name
+              Text(
+                widget.hotelName,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.6),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+
+              // Countdown Timer Bar
+              AnimatedBuilder(
+                animation: _timerController,
+                builder: (context, child) {
+                  return Container(
+                    height: 4,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: FractionallySizedBox(
+                        widthFactor: 1.0 - _timerController.value,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [AppColors.primary, AppColors.primaryLight],
+                            ),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'Order #${widget.orderId}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                  );
+                },
+              ),
+              const SizedBox(height: 20),
+
+              // Restaurant details info container
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.05),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.storefront_rounded,
+                        color: AppColors.primaryLight,
+                        size: 18,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'PICKUP FROM',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.4),
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            widget.hotelName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.close, color: Colors.white38, size: 18),
-                onPressed: (_isAccepting || _isRejecting) ? null : widget.onClose,
-              ),
-            ],
-          ),
+              const SizedBox(height: 20),
 
-          // ── Restaurant & Total ────────────────────────────────────────────
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.storefront_rounded, color: AppColors.primaryLight, size: 16),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    widget.hotelName,
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
+              // Earnings Section
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ESTIMATED EARNINGS',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.4),
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '₹${widget.grandTotal.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          color: AppColors.primaryLight,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white38, size: 20),
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.white.withOpacity(0.05),
+                      padding: const EdgeInsets.all(10),
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    onPressed: (_isAccepting || _isRejecting) ? null : widget.onClose,
                   ),
-                ),
-                Text(
-                  '₹${widget.grandTotal.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    color: AppColors.primaryLight,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // ── Action Buttons ────────────────────────────────────────────────
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              // Reject button
-              Expanded(
-                child: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.error,
-                    side: const BorderSide(color: AppColors.error, width: 1.2),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  onPressed: (_isAccepting || _isRejecting)
-                      ? null
-                      : () async {
-                          setState(() => _isRejecting = true);
-                          widget.onReject();
-                        },
-                  child: _isRejecting
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(color: AppColors.error, strokeWidth: 2),
-                        )
-                      : const Text(
-                          'Reject',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                ),
+                ],
               ),
-              const SizedBox(width: 12),
-              // Accept button
-              Expanded(
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.success,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    elevation: 0,
+              const SizedBox(height: 24),
+
+              // Action Buttons
+              Row(
+                children: [
+                  // Reject button
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.error,
+                        side: const BorderSide(color: AppColors.error, width: 1.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      onPressed: (_isAccepting || _isRejecting)
+                          ? null
+                          : () async {
+                              setState(() => _isRejecting = true);
+                              widget.onReject();
+                            },
+                      child: _isRejecting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(color: AppColors.error, strokeWidth: 2),
+                            )
+                          : const Text(
+                              'Reject',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                    ),
                   ),
-                  onPressed: (_isAccepting || _isRejecting)
-                      ? null
-                      : () async {
-                          setState(() => _isAccepting = true);
-                          widget.onAccept();
-                        },
-                  child: _isAccepting
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                        )
-                      : const Text(
-                          'Accept',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                        ),
-                ),
+                  const SizedBox(width: 12),
+                  // Accept button
+                  Expanded(
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.success,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        elevation: 0,
+                      ),
+                      onPressed: (_isAccepting || _isRejecting)
+                          ? null
+                          : () async {
+                              setState(() => _isAccepting = true);
+                              widget.onAccept();
+                            },
+                      child: _isAccepting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                            )
+                          : const Text(
+                              'Accept',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }

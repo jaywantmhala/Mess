@@ -17,6 +17,7 @@ class WebSocketService {
   bool _shouldReconnect = true;
   Timer? _reconnectTimer;
   Timer? _pingTimer;
+  String? _activeRole;
 
   final AudioPlayer _audioPlayer = AudioPlayer();
 
@@ -29,18 +30,29 @@ class WebSocketService {
   bool get isConnected => _channel != null;
 
   /// Start connection to WebSocket server
-  Future<void> connect() async {
+  Future<void> connect({String? role}) async {
+    if (role != null) {
+      _activeRole = role;
+    }
     if (_channel != null || _isConnecting) return;
     _isConnecting = true;
     _shouldReconnect = true;
 
     try {
-      String? token = await AuthService.instance.getSavedToken();
-      if (token == null || token.isEmpty) {
+      String? token;
+      if (_activeRole == 'driver') {
         token = await DriverAuthService.instance.getSavedToken();
+      } else if (_activeRole == 'vendor') {
+        token = await AuthService.instance.getSavedToken();
+      } else {
+        token = await AuthService.instance.getSavedToken();
+        if (token == null || token.isEmpty) {
+          token = await DriverAuthService.instance.getSavedToken();
+        }
       }
+
       if (token == null || token.isEmpty) {
-        debugPrint('WebSocket: No token found. Skipping connection.');
+        debugPrint('WebSocket: No token found for role: $_activeRole. Skipping connection.');
         _isConnecting = false;
         return;
       }
@@ -180,6 +192,7 @@ class WebSocketService {
   /// Explicitly disconnect from WebSocket
   void disconnect() {
     _shouldReconnect = false;
+    _activeRole = null;
     _reconnectTimer?.cancel();
     _cleanupChannel();
     debugPrint('WebSocket: Manually disconnected.');

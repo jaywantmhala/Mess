@@ -47,7 +47,7 @@ class _OrdersScreenState extends State<OrdersScreen> with AutomaticKeepAliveClie
 
   void _startWebSocketListener() {
     // Connect WS just in case
-    WebSocketService.instance.connect();
+    WebSocketService.instance.connect(role: 'vendor');
 
     _wsSubscription = WebSocketService.instance.messages.listen((msg) {
       final event = msg['event'] as String?;
@@ -94,6 +94,34 @@ class _OrdersScreenState extends State<OrdersScreen> with AutomaticKeepAliveClie
           }
         } catch (e) {
           debugPrint('Error updating order status from WebSocket payload: $e');
+        }
+      } else if (event == 'ORDER_ASSIGNED') {
+        // When vendor assigns a driver, update the order card instantly
+        try {
+          final orderId = eventData['order_id'] as int?;
+          final driverId = eventData['driver_id'] as int?;
+          if (orderId != null && mounted) {
+            // Stop the alert sound that may still be playing
+            WebSocketService.instance.stopAlertSound();
+            setState(() {
+              for (var order in _orders) {
+                if (order.orderId == orderId) {
+                  order.status = 'assigned';
+                  break;
+                }
+              }
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('✅ Driver assigned to Order #$orderId successfully!'),
+                backgroundColor: AppColors.primary,
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        } catch (e) {
+          debugPrint('Error handling ORDER_ASSIGNED in vendor: $e');
         }
       }
     });

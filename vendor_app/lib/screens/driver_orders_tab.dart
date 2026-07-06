@@ -1,24 +1,38 @@
 // lib/screens/driver_orders_tab.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../services/driver_order_service.dart';
+import '../services/websocket_service.dart';
 import '../theme/app_theme.dart';
 
 class DriverOrdersTab extends StatefulWidget {
   const DriverOrdersTab({super.key});
 
   @override
-  State<DriverOrdersTab> createState() => _DriverOrdersTabState();
+  State<DriverOrdersTab> createState() => DriverOrdersTabState();
 }
 
-class _DriverOrdersTabState extends State<DriverOrdersTab> {
+// Made public so driver_home_shell.dart can call reload() via GlobalKey
+class DriverOrdersTabState extends State<DriverOrdersTab> {
   bool _isLoading = true;
   List<DriverOrder> _orders = [];
+  StreamSubscription? _wsSubscription;
 
   @override
   void initState() {
     super.initState();
     _loadOrders();
+    _startWebSocketListener();
   }
+
+  @override
+  void dispose() {
+    _wsSubscription?.cancel();
+    super.dispose();
+  }
+
+  /// Called externally (from DriverHomeShell) to trigger a reload
+  void reload() => _loadOrders();
 
   Future<void> _loadOrders() async {
     setState(() => _isLoading = true);
@@ -31,6 +45,88 @@ class _DriverOrdersTabState extends State<DriverOrdersTab> {
     }
   }
 
+  /// Listen for ORDER_ASSIGNED WebSocket events and instantly inject the
+  /// order into the list — same pattern as vendor OrdersScreen for NEW_ORDER.
+  void _startWebSocketListener() {
+    _wsSubscription = WebSocketService.instance.messages.listen((msg) {
+      final event = msg['event'] as String?;
+      final eventData = msg['data'];
+      if (eventData == null) return;
+
+      if (event == 'ORDER_ASSIGNED') {
+        _handleOrderAssigned(eventData);
+      } else if (event == 'ORDER_STATUS_UPDATED') {
+        _handleStatusUpdated(eventData);
+      }
+    });
+  }
+
+  void _handleOrderAssigned(dynamic data) {
+    if (!mounted) return;
+    try {
+      final orderId = int.tryParse(data['order_id'].toString()) ?? 0;
+
+      // If the order already exists in our list, just update its status
+      final existingIndex = _orders.indexWhere((o) => o.orderId == orderId);
+      if (existingIndex >= 0) {
+        // Already have it – no duplicate needed
+        return;
+      }
+
+      // Fetch fresh list immediately so we get full order details
+      _loadOrders();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('📦 New delivery assigned: Order #$orderId!'),
+            backgroundColor: AppColors.primary,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('DriverOrdersTab: Error handling ORDER_ASSIGNED: $e');
+    }
+  }
+
+  void _handleStatusUpdated(dynamic data) {
+    if (!mounted) return;
+    try {
+      final orderId = int.tryParse(data['order_id'].toString()) ?? 0;
+      final status = data['status'] as String?;
+      if (orderId <= 0 || status == null) return;
+
+      setState(() {
+        for (int i = 0; i < _orders.length; i++) {
+          if (_orders[i].orderId == orderId) {
+            // DriverOrder is immutable – rebuild with new status
+            final old = _orders[i];
+            _orders[i] = DriverOrder(
+              orderId: old.orderId,
+              status: status,
+              grandTotal: old.grandTotal,
+              paymentMethod: old.paymentMethod,
+              deliveryAddress: old.deliveryAddress,
+              createdAt: old.createdAt,
+              hotelName: old.hotelName,
+              hotelAddress: old.hotelAddress,
+              hotelLat: old.hotelLat,
+              hotelLng: old.hotelLng,
+              customerLat: old.customerLat,
+              customerLng: old.customerLng,
+              customerName: old.customerName,
+            );
+            break;
+          }
+        }
+      });
+    } catch (e) {
+      debugPrint('DriverOrdersTab: Error handling ORDER_STATUS_UPDATED: $e');
+    }
+  }
+
   Future<void> _updateStatus(int orderId, String newStatus) async {
     final success = await DriverOrderService.instance.updateOrderStatus(
       orderId: orderId,
@@ -38,20 +134,24 @@ class _DriverOrdersTabState extends State<DriverOrdersTab> {
     );
 
     if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Order status updated to ${newStatus.replaceAll('_', ' ').toUpperCase()}'),
-          backgroundColor: AppColors.success,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Order status updated to ${newStatus.replaceAll('_', ' ').toUpperCase()}'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+      }
       _loadOrders();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to update order status. Please try again.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to update order status. Please try again.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
@@ -103,6 +203,12 @@ class _DriverOrdersTabState extends State<DriverOrdersTab> {
             'No assigned deliveries yet.',
             style: TextStyle(fontSize: 16, color: AppColors.textHint, fontWeight: FontWeight.w600),
           ),
+          const SizedBox(height: 6),
+          const Text(
+            'When a vendor assigns you an order,\nit will appear here instantly.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 13, color: AppColors.textHint),
+          ),
         ],
       ),
     );
@@ -133,7 +239,12 @@ class _DriverOrdersTabState extends State<DriverOrdersTab> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.grey.shade100),
+        border: Border.all(
+          color: order.status == 'assigned'
+              ? Colors.orange.withOpacity(0.5)
+              : Colors.grey.shade100,
+          width: order.status == 'assigned' ? 1.5 : 1,
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.015),
@@ -236,17 +347,38 @@ class _DriverOrdersTabState extends State<DriverOrdersTab> {
 
   Widget _buildActionButton(DriverOrder order) {
     if (order.status == 'assigned') {
-      return ElevatedButton.icon(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.success,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          elevation: 0,
-        ),
-        onPressed: () => _updateStatus(order.orderId, 'accepted_by_driver'),
-        icon: const Icon(Icons.check_circle_outline, size: 18),
-        label: const Text('Accept Delivery', style: TextStyle(fontWeight: FontWeight.bold)),
+      // Show Accept + Reject — same UX as vendor NEW_ORDER popup
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.error,
+                side: const BorderSide(color: AppColors.error, width: 1.2),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              onPressed: () => _updateStatus(order.orderId, 'rejected_by_driver'),
+              icon: const Icon(Icons.close, size: 16),
+              label: const Text('Reject', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.success,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                elevation: 0,
+              ),
+              onPressed: () => _updateStatus(order.orderId, 'accepted_by_driver'),
+              icon: const Icon(Icons.check_circle_outline, size: 18),
+              label: const Text('Accept', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
       );
     } else if (order.status == 'accepted_by_driver') {
       return ElevatedButton.icon(

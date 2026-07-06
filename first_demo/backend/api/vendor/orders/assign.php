@@ -72,26 +72,38 @@ try {
     $customerId = (int)$order['customer_id'];
     $hotelId = (int)$order['hotel_id'];
 
+    // Fetch additional info for the driver's notification
+    $hotelStmt = $pdo->prepare("SELECT hotel_name, grand_total FROM hotels h JOIN orders o ON o.hotel_id = h.id WHERE o.order_id = ? LIMIT 1");
+    $hotelStmt->execute([$orderId]);
+    $orderExtra = $hotelStmt->fetch(PDO::FETCH_ASSOC);
+    $hotelName = $orderExtra['hotel_name'] ?? 'Restaurant';
+    $grandTotal = (float)($orderExtra['grand_total'] ?? 0.0);
+
     // ── Send system notifications to WebSocket server ─────────────────
     try {
-        $fp = @fsockopen("127.0.0.1", 8081, $errno, $errstr, 1);
-        if ($fp) {
-            // Event 1: Notify driver of new assignment
+        // Event 1: Notify driver of new assignment (with full order details)
+        $fp1 = @fsockopen("127.0.0.1", 8081, $errno, $errstr, 1);
+        if ($fp1) {
             $notifDriver = [
                 'system_event' => true,
                 'secret' => 'first_demo_system_websocket_secret_key_2026',
                 'event' => 'ORDER_ASSIGNED',
                 'data' => [
-                    'order_id' => $orderId,
-                    'driver_id' => $driverId,
-                    'hotel_id' => $hotelId,
-                    'status' => 'assigned',
-                    'hotel_name' => '', // Loaded dynamically in UI
+                    'order_id'   => $orderId,
+                    'driver_id'  => $driverId,
+                    'hotel_id'   => $hotelId,
+                    'hotel_name' => $hotelName,
+                    'grand_total'=> $grandTotal,
+                    'status'     => 'assigned',
                 ]
             ];
-            @fwrite($fp, json_encode($notifDriver) . "\n");
-            
-            // Event 2: Broadcast status change
+            @fwrite($fp1, json_encode($notifDriver));
+            @fclose($fp1);
+        }
+
+        // Event 2: Broadcast status change
+        $fp2 = @fsockopen("127.0.0.1", 8081, $errno, $errstr, 1);
+        if ($fp2) {
             $notifStatus = [
                 'system_event' => true,
                 'secret' => 'first_demo_system_websocket_secret_key_2026',
@@ -103,8 +115,8 @@ try {
                     'status' => 'assigned'
                 ]
             ];
-            @fwrite($fp, json_encode($notifStatus) . "\n");
-            @fclose($fp);
+            @fwrite($fp2, json_encode($notifStatus));
+            @fclose($fp2);
         }
     } catch (Exception $e) {
         // Suppress WebSocket notification error to avoid blocking the REST response

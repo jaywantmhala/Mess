@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 
 import 'tabs/dashboard_tab.dart';
 import 'tabs/menu_tab.dart';
@@ -35,6 +36,10 @@ class _HomeShellState extends State<HomeShell>
   double? _dragX;
   double? _dragY;
 
+  // Driver assignment overlay
+  OverlayEntry? _assignmentOverlay;
+  StreamSubscription? _wsSubscription;
+
   static const _navItems = [
     _NavItem(icon: Icons.home_rounded,              label: 'Home'),
     _NavItem(icon: Icons.restaurant_menu_rounded,   label: 'Menu'),
@@ -53,7 +58,6 @@ class _HomeShellState extends State<HomeShell>
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: 0);
-    // Entry fade-in for the whole shell
     _entryCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 500),
@@ -63,14 +67,81 @@ class _HomeShellState extends State<HomeShell>
 
     // Establish WebSocket Connection
     WebSocketService.instance.connect();
+
+    // Listen for ORDER_ASSIGNED events to show driver notification overlay
+    _wsSubscription = WebSocketService.instance.messages.listen((msg) {
+      final event = msg['event'] as String?;
+      if (event == 'ORDER_ASSIGNED') {
+        final data = msg['data'];
+        if (data != null && mounted) {
+          _showAssignmentOverlay(data);
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
+    _wsSubscription?.cancel();
+    WebSocketService.instance.stopAlertSound();
+    _assignmentOverlay?.remove();
+    _assignmentOverlay = null;
     _pageController.dispose();
     _entryCtrl.dispose();
     WebSocketService.instance.disconnect();
     super.dispose();
+  }
+
+  void _showAssignmentOverlay(dynamic data) {
+    if (!mounted) return;
+    if (_assignmentOverlay != null) {
+      _assignmentOverlay?.remove();
+      _assignmentOverlay = null;
+    }
+
+    final orderId = data['order_id'] ?? 0;
+    final hotelName = data['hotel_name']?.toString() ?? 'Restaurant';
+    final grandTotal = double.tryParse(data['grand_total']?.toString() ?? '0') ?? 0.0;
+
+    _assignmentOverlay = OverlayEntry(
+      builder: (context) {
+        return Positioned(
+          top: MediaQuery.of(context).padding.top + 12,
+          left: 16,
+          right: 16,
+          child: Material(
+            color: Colors.transparent,
+            child: _DriverAssignmentOverlayContent(
+              orderId: orderId,
+              hotelName: hotelName,
+              grandTotal: grandTotal,
+              onDismiss: () {
+                WebSocketService.instance.stopAlertSound();
+                _assignmentOverlay?.remove();
+                _assignmentOverlay = null;
+              },
+              onViewOrder: () {
+                WebSocketService.instance.stopAlertSound();
+                _assignmentOverlay?.remove();
+                _assignmentOverlay = null;
+                _onTabTapped(0);
+              },
+            ),
+          ),
+        );
+      },
+    );
+
+    final overlayState = Overlay.of(context);
+    overlayState.insert(_assignmentOverlay!);
+
+    Timer(const Duration(seconds: 30), () {
+      if (_assignmentOverlay != null) {
+        WebSocketService.instance.stopAlertSound();
+        _assignmentOverlay?.remove();
+        _assignmentOverlay = null;
+      }
+    });
   }
 
   void _onTabTapped(int index) {
@@ -449,4 +520,183 @@ class _NavItem {
   final IconData icon;
   final String label;
   const _NavItem({required this.icon, required this.label});
+}
+
+// ── Driver Assignment Alert Overlay ───────────────────────────────────────────
+class _DriverAssignmentOverlayContent extends StatefulWidget {
+  final int orderId;
+  final String hotelName;
+  final double grandTotal;
+  final VoidCallback onDismiss;
+  final VoidCallback onViewOrder;
+
+  const _DriverAssignmentOverlayContent({
+    required this.orderId,
+    required this.hotelName,
+    required this.grandTotal,
+    required this.onDismiss,
+    required this.onViewOrder,
+  });
+
+  @override
+  State<_DriverAssignmentOverlayContent> createState() =>
+      _DriverAssignmentOverlayContentState();
+}
+
+class _DriverAssignmentOverlayContentState
+    extends State<_DriverAssignmentOverlayContent>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pulseCtrl;
+  late Animation<double> _pulseAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _pulseAnim = Tween<double>(begin: 0.85, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F1A2E),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFFFB300).withOpacity(0.7), width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFFB300).withOpacity(0.25),
+            blurRadius: 24,
+            spreadRadius: 2,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.4),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              // Pulsing icon
+              ScaleTransition(
+                scale: _pulseAnim,
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFB300).withOpacity(0.15),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: const Color(0xFFFFB300).withOpacity(0.5),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.delivery_dining_rounded,
+                    color: Color(0xFFFFB300),
+                    size: 26,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '🚀 NEW DELIVERY ASSIGNED!',
+                      style: TextStyle(
+                        color: Color(0xFFFFB300),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Order #${widget.orderId}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${widget.hotelName} • ₹${widget.grandTotal.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        color: Colors.white60,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.white38, size: 20),
+                onPressed: widget.onDismiss,
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white60,
+                    side: const BorderSide(color: Colors.white24, width: 1.2),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: widget.onDismiss,
+                  child: const Text(
+                    'Dismiss',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFFFB300),
+                    foregroundColor: const Color(0xFF0F1A2E),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: widget.onViewOrder,
+                  icon: const Icon(Icons.directions_bike_rounded, size: 18),
+                  label: const Text(
+                    'Go to Order',
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }

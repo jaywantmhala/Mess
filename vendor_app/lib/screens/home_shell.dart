@@ -65,7 +65,7 @@ class _HomeShellState extends State<HomeShell> with TickerProviderStateMixin {
     _iconControllers[0].forward(from: 0);
 
     // Establish WebSocket Connection
-    WebSocketService.instance.connect();
+    WebSocketService.instance.connect(role: 'vendor');
     _startWSListener();
   }
 

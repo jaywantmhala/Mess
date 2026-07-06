@@ -1,6 +1,5 @@
 // lib/screens/driver_home_shell.dart
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'driver_dashboard_tab.dart';
@@ -23,6 +22,9 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
   OverlayEntry? _assignmentOverlay;
   StreamSubscription? _wsSubscription;
 
+  // GlobalKey so we can call reload() on DriverOrdersTab when a new order arrives
+  final GlobalKey<DriverOrdersTabState> _ordersTabKey = GlobalKey<DriverOrdersTabState>();
+
   late List<AnimationController> _iconControllers;
   late List<Animation<double>> _iconScales;
 
@@ -36,10 +38,12 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
   void initState() {
     super.initState();
     _pageController = PageController();
-    _tabs = const [
-      DriverDashboardTab(),
-      DriverOrdersTab(),
-      DriverProfileTab(),
+
+    // Pass the GlobalKey so we can call reload() from outside
+    _tabs = [
+      const DriverDashboardTab(),
+      DriverOrdersTab(key: _ordersTabKey),
+      const DriverProfileTab(),
     ];
 
     _iconControllers = List.generate(
@@ -63,7 +67,7 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
     _iconControllers[0].forward(from: 0);
 
     // Connect WebSocket and listen for notifications
-    WebSocketService.instance.connect();
+    WebSocketService.instance.connect(role: 'driver');
     _startWSListener();
   }
 
@@ -81,6 +85,7 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
 
   void _showAssignmentNotification(dynamic orderData) {
     if (!mounted) return;
+    // Dismiss any existing overlay
     if (_assignmentOverlay != null) {
       WebSocketService.instance.stopAlertSound();
       _assignmentOverlay?.remove();
@@ -88,6 +93,11 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
     }
 
     final orderId = orderData['order_id'] ?? 0;
+    final hotelName = (orderData['hotel_name'] ?? 'Restaurant') as String;
+    final grandTotal = double.tryParse((orderData['grand_total'] ?? 0).toString()) ?? 0.0;
+
+    // Note: WebSocketService._handleMessage() already calls _playAlertSound()
+    // automatically when ORDER_ASSIGNED event is received, so no need to call it here.
 
     _assignmentOverlay = OverlayEntry(
       builder: (context) {
@@ -99,17 +109,36 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
             color: Colors.transparent,
             child: _DriverNotificationOverlayContent(
               orderId: orderId,
+              hotelName: hotelName,
+              grandTotal: grandTotal,
               onClose: () {
                 WebSocketService.instance.stopAlertSound();
                 _assignmentOverlay?.remove();
                 _assignmentOverlay = null;
               },
+              onReject: () async {
+                WebSocketService.instance.stopAlertSound();
+                _assignmentOverlay?.remove();
+                _assignmentOverlay = null;
+                // Reject the order
+                await DriverOrderService.instance.updateOrderStatus(
+                  orderId: orderId,
+                  status: 'rejected_by_driver',
+                );
+                // Refresh orders tab
+                _ordersTabKey.currentState?.reload();
+              },
               onAccept: () async {
                 WebSocketService.instance.stopAlertSound();
                 _assignmentOverlay?.remove();
                 _assignmentOverlay = null;
-                // Accept order
-                await DriverOrderService.instance.updateOrderStatus(orderId: orderId, status: 'accepted_by_driver');
+                // Accept the order
+                await DriverOrderService.instance.updateOrderStatus(
+                  orderId: orderId,
+                  status: 'accepted_by_driver',
+                );
+                // Refresh orders tab first, then navigate there
+                _ordersTabKey.currentState?.reload();
                 _onTabSelected(1); // Navigate to Orders Tab
               },
             ),
@@ -121,6 +150,7 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
     final overlayState = Overlay.of(context);
     overlayState.insert(_assignmentOverlay!);
 
+    // Auto-dismiss after 30 seconds
     Timer(const Duration(seconds: 30), () {
       if (_assignmentOverlay != null) {
         WebSocketService.instance.stopAlertSound();
@@ -235,14 +265,25 @@ class _NavItem {
   });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Overlay popup — shown when vendor assigns an order to this driver.
+// Matches the vendor's NEW_ORDER popup: danger_alert.mp3 sound + Accept + Reject
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _DriverNotificationOverlayContent extends StatefulWidget {
   final int orderId;
+  final String hotelName;
+  final double grandTotal;
   final VoidCallback onClose;
+  final VoidCallback onReject;
   final VoidCallback onAccept;
 
   const _DriverNotificationOverlayContent({
     required this.orderId,
+    required this.hotelName,
+    required this.grandTotal,
     required this.onClose,
+    required this.onReject,
     required this.onAccept,
   });
 
@@ -251,41 +292,75 @@ class _DriverNotificationOverlayContent extends StatefulWidget {
       _DriverNotificationOverlayContentState();
 }
 
-class _DriverNotificationOverlayContentState extends State<_DriverNotificationOverlayContent> {
-  bool _isProcessing = false;
+class _DriverNotificationOverlayContentState
+    extends State<_DriverNotificationOverlayContent>
+    with SingleTickerProviderStateMixin {
+  bool _isAccepting = false;
+  bool _isRejecting = false;
+
+  // Pulse animation for the delivery icon
+  late AnimationController _pulseController;
+  late Animation<double> _pulseAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _pulseAnim = Tween<double>(begin: 0.85, end: 1.15).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: const Color(0xFF1E1E2E),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withOpacity(0.5), width: 1.5),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.primary.withOpacity(0.6), width: 1.8),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: AppColors.primary.withOpacity(0.25),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.4),
             blurRadius: 12,
-            offset: const Offset(0, 6),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Header ────────────────────────────────────────────────────────
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.delivery_dining_rounded,
-                  color: AppColors.primary,
-                  size: 20,
+              ScaleTransition(
+                scale: _pulseAnim,
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.18),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.delivery_dining_rounded,
+                    color: AppColors.primary,
+                    size: 24,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -297,17 +372,17 @@ class _DriverNotificationOverlayContentState extends State<_DriverNotificationOv
                       '🔔 NEW DELIVERY ASSIGNED!',
                       style: TextStyle(
                         color: AppColors.primaryLight,
-                        fontSize: 12,
+                        fontSize: 11,
                         fontWeight: FontWeight.w900,
-                        letterSpacing: 0.8,
+                        letterSpacing: 1.0,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       'Order #${widget.orderId}',
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 15,
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -315,53 +390,104 @@ class _DriverNotificationOverlayContentState extends State<_DriverNotificationOv
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.close, color: Colors.white60, size: 18),
-                onPressed: widget.onClose,
+                icon: const Icon(Icons.close, color: Colors.white38, size: 18),
+                onPressed: (_isAccepting || _isRejecting) ? null : widget.onClose,
               ),
             ],
           ),
-          const SizedBox(height: 16),
+
+          // ── Restaurant & Total ────────────────────────────────────────────
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.storefront_rounded, color: AppColors.primaryLight, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    widget.hotelName,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Text(
+                  '₹${widget.grandTotal.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    color: AppColors.primaryLight,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Action Buttons ────────────────────────────────────────────────
+          const SizedBox(height: 14),
           Row(
             children: [
+              // Reject button
               Expanded(
                 child: OutlinedButton(
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white60,
-                    side: const BorderSide(color: Colors.white30, width: 1.2),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    foregroundColor: AppColors.error,
+                    side: const BorderSide(color: AppColors.error, width: 1.2),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  onPressed: _isProcessing ? null : widget.onClose,
-                  child: const Text(
-                    'Close',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
+                  onPressed: (_isAccepting || _isRejecting)
+                      ? null
+                      : () async {
+                          setState(() => _isRejecting = true);
+                          widget.onReject();
+                        },
+                  child: _isRejecting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(color: AppColors.error, strokeWidth: 2),
+                        )
+                      : const Text(
+                          'Reject',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
                 ),
               ),
               const SizedBox(width: 12),
+              // Accept button
               Expanded(
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.success,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                     elevation: 0,
                   ),
-                  onPressed: _isProcessing
+                  onPressed: (_isAccepting || _isRejecting)
                       ? null
                       : () async {
-                          setState(() => _isProcessing = true);
+                          setState(() => _isAccepting = true);
                           widget.onAccept();
                         },
-                  child: _isProcessing
+                  child: _isAccepting
                       ? const SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
                         )
                       : const Text(
-                          'Accept Order',
+                          'Accept',
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                         ),
                 ),

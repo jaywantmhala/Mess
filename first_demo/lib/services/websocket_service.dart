@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'auth_service.dart';
 import '../utils/app_config.dart';
 
@@ -15,6 +16,8 @@ class WebSocketService {
   bool _shouldReconnect = true;
   Timer? _reconnectTimer;
   Timer? _pingTimer;
+
+  final AudioPlayer _audioPlayer = AudioPlayer();
 
   // Stream controller to broadcast parsed incoming messages (e.g. order status updates)
   final StreamController<Map<String, dynamic>> _messageController =
@@ -33,7 +36,7 @@ class WebSocketService {
     try {
       final token = await AuthService.instance.getSavedToken();
       if (token == null) {
-        debugPrint('WebSocket (Customer): No token found. Skipping connection.');
+        debugPrint('WebSocket (Driver): No token found. Skipping connection.');
         _isConnecting = false;
         return;
       }
@@ -41,7 +44,7 @@ class WebSocketService {
       // Convert http://10.196.36.233:8000 to ws://10.196.36.233:8081
       final wsUrlBase = kBaseUrl.replaceFirst('http://', 'ws://').replaceFirst(':8000', ':8081');
       final uri = Uri.parse('$wsUrlBase?token=$token');
-      debugPrint('WebSocket (Customer): Connecting to $uri');
+      debugPrint('WebSocket (Driver): Connecting to $uri');
       
       _channel = WebSocketChannel.connect(uri);
       _isConnecting = false;
@@ -55,16 +58,16 @@ class WebSocketService {
           _handleMessage(message);
         },
         onError: (error) {
-          debugPrint('WebSocket (Customer) Error: $error');
+          debugPrint('WebSocket (Driver) Error: $error');
           _handleDisconnect();
         },
         onDone: () {
-          debugPrint('WebSocket (Customer) connection closed.');
+          debugPrint('WebSocket (Driver) connection closed.');
           _handleDisconnect();
         },
       );
     } catch (e) {
-      debugPrint('WebSocket (Customer): Connection failed: $e');
+      debugPrint('WebSocket (Driver): Connection failed: $e');
       _isConnecting = false;
       _handleDisconnect();
     }
@@ -77,13 +80,59 @@ class WebSocketService {
       
       // Handle pong message
       if (data['type'] == 'pong') {
-        debugPrint('WebSocket (Customer): Received Pong');
+        debugPrint('WebSocket (Driver): Received Pong');
         return;
+      }
+
+      // Play alert sound when vendor assigns an order to THIS driver
+      final event = data['event'] as String?;
+      if (event == 'ORDER_ASSIGNED') {
+        debugPrint('WebSocket (Driver): ORDER_ASSIGNED received! Playing alert...');
+        _playAlertSound();
       }
 
       _messageController.add(data);
     } catch (e) {
-      debugPrint('WebSocket (Customer): Error parsing message: $e');
+      debugPrint('WebSocket (Driver): Error parsing message: $e');
+    }
+  }
+
+  /// Play the looping alert sound to notify driver of new assignment
+  Future<void> _playAlertSound() async {
+    try {
+      debugPrint('WebSocket (Driver): Playing assignment alert sound...');
+      await _audioPlayer.setAudioContext(AudioContext(
+        android: const AudioContextAndroid(
+          isSpeakerphoneOn: true,
+          stayAwake: true,
+          contentType: AndroidContentType.music,
+          usageType: AndroidUsageType.alarm,
+          audioFocus: AndroidAudioFocus.gainTransient,
+        ),
+        iOS: AudioContextIOS(
+          category: AVAudioSessionCategory.playback,
+          options: {AVAudioSessionOptions.mixWithOthers},
+        ),
+      ));
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
+      await _audioPlayer.setVolume(1.0);
+      await _audioPlayer.stop();
+      await _audioPlayer.setSource(AssetSource('sounds/success.mp3'));
+      await _audioPlayer.resume();
+      debugPrint('WebSocket (Driver): Alert sound playing.');
+    } catch (e, stack) {
+      debugPrint('WebSocket (Driver): Failed to play alert sound: $e\n$stack');
+    }
+  }
+
+  /// Stop the alert sound (called when driver acknowledges the assignment)
+  Future<void> stopAlertSound() async {
+    try {
+      await _audioPlayer.setReleaseMode(ReleaseMode.release);
+      await _audioPlayer.stop();
+      debugPrint('WebSocket (Driver): Stopped alert sound.');
+    } catch (e) {
+      debugPrint('WebSocket (Driver): Failed to stop alert sound: $e');
     }
   }
 
@@ -93,7 +142,7 @@ class WebSocketService {
     if (_shouldReconnect) {
       _reconnectTimer?.cancel();
       _reconnectTimer = Timer(const Duration(seconds: 4), () {
-        debugPrint('WebSocket (Customer): Attempting to reconnect...');
+        debugPrint('WebSocket (Driver): Attempting to reconnect...');
         connect();
       });
     }
@@ -105,10 +154,10 @@ class WebSocketService {
     _pingTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
       if (_channel != null) {
         try {
-          debugPrint('WebSocket (Customer): Sending Ping');
+          debugPrint('WebSocket (Driver): Sending Ping');
           _channel!.sink.add(jsonEncode({'type': 'ping'}));
         } catch (e) {
-          debugPrint('WebSocket (Customer): Ping failed: $e');
+          debugPrint('WebSocket (Driver): Ping failed: $e');
           _handleDisconnect();
         }
       }
@@ -127,6 +176,6 @@ class WebSocketService {
     _shouldReconnect = false;
     _reconnectTimer?.cancel();
     _cleanupChannel();
-    debugPrint('WebSocket (Customer): Manually disconnected.');
+    debugPrint('WebSocket (Driver): Manually disconnected.');
   }
 }

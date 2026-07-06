@@ -85,6 +85,7 @@ class _HomeShellState extends State<HomeShell> with TickerProviderStateMixin {
     if (!mounted) return;
     // Dismiss any existing overlay
     if (_newOrderOverlay != null) {
+      WebSocketService.instance.stopAlertSound();
       _newOrderOverlay?.remove();
       _newOrderOverlay = null;
     }
@@ -108,10 +109,12 @@ class _HomeShellState extends State<HomeShell> with TickerProviderStateMixin {
               grandTotal: grandTotal,
               itemsList: itemsList,
               onClose: () {
+                WebSocketService.instance.stopAlertSound();
                 _newOrderOverlay?.remove();
                 _newOrderOverlay = null;
               },
               onViewDetails: () {
+                WebSocketService.instance.stopAlertSound();
                 _newOrderOverlay?.remove();
                 _newOrderOverlay = null;
                 // Switch to Orders tab (index 1)
@@ -130,6 +133,7 @@ class _HomeShellState extends State<HomeShell> with TickerProviderStateMixin {
     // Auto-remove after 30 seconds
     Timer(const Duration(seconds: 30), () {
       if (_newOrderOverlay != null) {
+        WebSocketService.instance.stopAlertSound();
         _newOrderOverlay?.remove();
         _newOrderOverlay = null;
       }
@@ -138,6 +142,7 @@ class _HomeShellState extends State<HomeShell> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    WebSocketService.instance.stopAlertSound();
     _newOrderOverlay?.remove();
     _newOrderOverlay = null;
     _wsSubscription?.cancel();

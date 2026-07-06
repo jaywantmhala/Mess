@@ -101,7 +101,13 @@ class WebSocketService {
       debugPrint('WebSocket: Attempting to play alert sound...');
       // Set audio context to force speaker/out loud
       await _audioPlayer.setAudioContext(AudioContext(
-        android: const AudioContextAndroid(),
+        android: const AudioContextAndroid(
+          isSpeakerphoneOn: true,
+          stayAwake: true,
+          contentType: AndroidContentType.music,
+          usageType: AndroidUsageType.alarm,
+          audioFocus: AndroidAudioFocus.gainTransient,
+        ),
         iOS: AudioContextIOS(
           category: AVAudioSessionCategory.playback,
           options: {
@@ -109,6 +115,7 @@ class WebSocketService {
           },
         ),
       ));
+      await _audioPlayer.setReleaseMode(ReleaseMode.loop);
       await _audioPlayer.setVolume(1.0);
       await _audioPlayer.stop();
       // Using sound/danger_alert.mp3 since it matches assets/sound/danger_alert.mp3
@@ -117,6 +124,17 @@ class WebSocketService {
       debugPrint('WebSocket: Played alert sound successfully.');
     } catch (e, stack) {
       debugPrint('WebSocket: Failed to play alert sound: $e\n$stack');
+    }
+  }
+
+  /// Stop the notification alert sound
+  Future<void> stopAlertSound() async {
+    try {
+      await _audioPlayer.setReleaseMode(ReleaseMode.release);
+      await _audioPlayer.stop();
+      debugPrint('WebSocket: Stopped alert sound.');
+    } catch (e) {
+      debugPrint('WebSocket: Failed to stop alert sound: $e');
     }
   }
 

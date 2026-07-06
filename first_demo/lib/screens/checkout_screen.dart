@@ -1,5 +1,6 @@
-// lib/screens/checkout_screen.dart
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../models/cart.dart';
 import '../models/order.dart';
 import '../models/wallet.dart';
@@ -125,6 +126,45 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _showSuccessDialog(OrderResult result) async {
+    // 1. Play success chime sound!
+    final audioPlayer = AudioPlayer();
+    try {
+      await audioPlayer.setAudioContext(AudioContext(
+        android: const AudioContextAndroid(
+          isSpeakerphoneOn: true,
+          stayAwake: true,
+          contentType: AndroidContentType.music,
+          usageType: AndroidUsageType.media,
+          audioFocus: AndroidAudioFocus.gainTransient,
+        ),
+        iOS: AudioContextIOS(
+          category: AVAudioSessionCategory.playback,
+          options: {
+            AVAudioSessionOptions.mixWithOthers,
+          },
+        ),
+      ));
+      await audioPlayer.setVolume(1.0);
+      await audioPlayer.play(AssetSource('sounds/success.mp3'));
+    } catch (e) {
+      debugPrint('Failed to play success sound: $e');
+    }
+
+    // 2. Set up auto redirect timer
+    bool redirected = false;
+    final timer = Timer(const Duration(seconds: 3), () {
+      if (mounted && !redirected) {
+        redirected = true;
+        // Close dialog
+        Navigator.of(context, rootNavigator: true).pop();
+        // Pop CheckoutScreen
+        Navigator.pop(context);
+        // Navigate to Order Status Screen
+        widget.onOrderPlaced?.call();
+      }
+    });
+
+    // 3. Show dialog and await user interaction (if they tap early)
     await showDialog(
       context: context,
       barrierDismissible: false,
@@ -147,14 +187,24 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               ),
               const SizedBox(height: 20),
               const Text(
-                'Order Placed! 🎉',
+                'Congratulations! 🥳',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w900,
                   color: _textDark,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
+              const Text(
+                'Your order has been placed successfully!',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                  color: _green,
+                ),
+              ),
+              const SizedBox(height: 14),
               Text(
                 'Order #${result.orderId}',
                 style: const TextStyle(fontSize: 13, color: _textGrey),
@@ -196,8 +246,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                   onPressed: () {
-                    Navigator.pop(ctx);
-                    widget.onOrderPlaced?.call();
+                    if (!redirected) {
+                      redirected = true;
+                      timer.cancel();
+                      Navigator.pop(ctx);
+                      Navigator.pop(context);
+                      widget.onOrderPlaced?.call();
+                    }
                   },
                   child: const Text('Track Order',
                       style: TextStyle(

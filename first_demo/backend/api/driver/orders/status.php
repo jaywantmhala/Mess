@@ -64,8 +64,38 @@ try {
     $customerId = (int)$order['customer_id'];
     $hotelId = (int)$order['hotel_id'];
 
+    // If order is completed, check for previous pending tiffin returns from the same hotel
+    $hasPendingTiffin = false;
+    $pendingTiffinOrder = null;
+    if ($status === 'completed') {
+        $pendingStmt = $pdo->prepare("
+            SELECT order_id, hotel_id 
+            FROM orders 
+            WHERE customer_id = ? 
+              AND hotel_id = ? 
+              AND tiffin_received_to_hotel = 'pending' 
+              AND order_id < ? 
+              AND status = 'completed'
+            ORDER BY order_id ASC 
+            LIMIT 1
+        ");
+        $pendingStmt->execute([$customerId, $hotelId, $orderId]);
+        $pendingTiffinOrder = $pendingStmt->fetch(PDO::FETCH_ASSOC);
+        
+        if ($pendingTiffinOrder) {
+            $hasPendingTiffin = true;
+            // Generate 4-digit OTP
+            $otp = strval(rand(1000, 9999));
+            // Store OTP in database
+            $otpStmt = $pdo->prepare("UPDATE orders SET tiffin_return_otp = ? WHERE order_id = ?");
+            $otpStmt->execute([$otp, $pendingTiffinOrder['order_id']]);
+            $pendingTiffinOrder['otp'] = $otp;
+        }
+    }
+
     // ── Send real-time notification to WebSocket server ─────────────────
     try {
+        // Send ORDER_STATUS_UPDATED event
         $fp = @fsockopen("127.0.0.1", 8081, $errno, $errstr, 1);
         if ($fp) {
             $notification = [
@@ -81,6 +111,34 @@ try {
             ];
             @fwrite($fp, json_encode($notification));
             @fclose($fp);
+        }
+
+        // If there's a pending tiffin, send the PENDING_TIFFIN_RETURN event in a new connection
+        if ($hasPendingTiffin && $pendingTiffinOrder) {
+            // Fetch hotel name
+            $hotelStmt = $pdo->prepare("SELECT hotel_name FROM hotels WHERE id = ?");
+            $hotelStmt->execute([$hotelId]);
+            $hotelName = $hotelStmt->fetchColumn() ?: 'Restaurant';
+
+            $fpTiffin = @fsockopen("127.0.0.1", 8081, $errno, $errstr, 1);
+            if ($fpTiffin) {
+                $tiffinNotification = [
+                    'system_event' => true,
+                    'secret' => 'first_demo_system_websocket_secret_key_2026',
+                    'event' => 'PENDING_TIFFIN_RETURN',
+                    'data' => [
+                        'previous_order_id' => (int)$pendingTiffinOrder['order_id'],
+                        'current_order_id' => $orderId,
+                        'customer_id' => $customerId,
+                        'driver_id' => $driverId,
+                        'hotel_id' => $hotelId,
+                        'hotel_name' => $hotelName,
+                        'otp' => $pendingTiffinOrder['otp']
+                    ]
+                ];
+                @fwrite($fpTiffin, json_encode($tiffinNotification));
+                @fclose($fpTiffin);
+            }
         }
     } catch (Exception $e) {
         // Suppress WebSocket notification error to avoid blocking the REST response

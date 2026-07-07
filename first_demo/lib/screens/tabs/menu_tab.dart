@@ -1,404 +1,467 @@
 import 'package:flutter/material.dart';
-
-class MenuItemModel {
-  final String name;
-  final bool isVeg;
-  final String calories;
-  final String protein;
-  final double rating;
-  final List<String> tags;
-  bool isLiked;
-  bool notifyMe;
-
-  MenuItemModel({
-    required this.name,
-    required this.isVeg,
-    required this.calories,
-    required this.protein,
-    required this.rating,
-    required this.tags,
-    this.isLiked = false,
-    this.notifyMe = false,
-  });
-}
+import '../../models/order.dart';
+import '../../services/order_service.dart';
+import '../order_status_screen.dart';
 
 class MenuTab extends StatefulWidget {
   const MenuTab({super.key});
 
   @override
-  State<MenuTab> createState() => _MenuTabState();
+  State<MenuTab> createState() => MenuTabState();
 }
 
-class _MenuTabState extends State<MenuTab> {
-  int _selectedDayIndex = 0;
-  String _selectedMealSession = 'Lunch';
+class MenuTabState extends State<MenuTab> {
+  static const Color textDark = Color(0xFF1A1A2E);
+  static const Color textGrey = Color(0xFF6B7280);
+  static const Color coralPrimary = Color(0xFFE8614A);
+  static const Color coralSoft = Color(0xFFFFEDE9);
+  static const Color emeraldGreen = Color(0xFF10B981);
+  static const Color amberYellow = Color(0xFFF59E0B);
 
-  final List<Map<String, String>> _weekDays = [
-    {'day': 'Fri', 'date': '03'},
-    {'day': 'Sat', 'date': '04'},
-    {'day': 'Sun', 'date': '05'},
-    {'day': 'Mon', 'date': '06'},
-    {'day': 'Tue', 'date': '07'},
-    {'day': 'Wed', 'date': '08'},
-    {'day': 'Thu', 'date': '09'},
-  ];
+  final List<OrderHistoryItem> _orders = [];
+  int _currentPage = 1;
+  final int _limit = 10;
+  bool _isFirstLoad = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  String _filter = 'All'; // 'All', 'Pending', 'Returned'
 
-  final List<String> _mealSessions = ['Breakfast', 'Lunch', 'Snacks', 'Dinner'];
+  @override
+  void initState() {
+    super.initState();
+    fetchOrders(isRefresh: true);
+  }
 
-  // Dummy menus database
-  final Map<String, Map<String, List<MenuItemModel>>> _menuDatabase = {
-    'Breakfast': {
-      'default': [
-        MenuItemModel(name: 'Aloo Paratha with Curd', isVeg: true, calories: '350 kcal', protein: '8g', rating: 4.5, tags: ['Popular', 'North Indian']),
-        MenuItemModel(name: 'Boiled Eggs (2)', isVeg: false, calories: '155 kcal', protein: '13g', rating: 4.8, tags: ['High Protein']),
-        MenuItemModel(name: 'Idli Vada with Sambar', isVeg: true, calories: '280 kcal', protein: '6g', rating: 4.3, tags: ['South Indian', 'Light']),
-        MenuItemModel(name: 'Masala Tea / Filter Coffee', isVeg: true, calories: '90 kcal', protein: '2g', rating: 4.7, tags: ['Beverage']),
-      ]
-    },
-    'Lunch': {
-      'default': [
-        MenuItemModel(name: 'Paneer Butter Masala', isVeg: true, calories: '380 kcal', protein: '12g', rating: 4.7, tags: ['Chef Special', 'Spicy']),
-        MenuItemModel(name: 'Kadhai Chicken (Premium Canteen)', isVeg: false, calories: '450 kcal', protein: '28g', rating: 4.9, tags: ['Non-Veg', 'High Protein']),
-        MenuItemModel(name: 'Dal Makhani & Butter Naan', isVeg: true, calories: '420 kcal', protein: '10g', rating: 4.6, tags: ['Classic']),
-        MenuItemModel(name: 'Jeera Rice & Green Salad', isVeg: true, calories: '210 kcal', protein: '4g', rating: 4.2, tags: ['Daily']),
-      ],
-      'Sun': [ // Special Sunday lunch
-        MenuItemModel(name: 'Hyderabadi Dum Biryani', isVeg: false, calories: '650 kcal', protein: '24g', rating: 4.9, tags: ['Weekend Special', 'Spicy']),
-        MenuItemModel(name: 'Shahi Paneer Biryani', isVeg: true, calories: '580 kcal', protein: '16g', rating: 4.8, tags: ['Weekend Special']),
-        MenuItemModel(name: 'Mixed Raita & Double Ka Meetha', isVeg: true, calories: '250 kcal', protein: '5g', rating: 4.6, tags: ['Dessert']),
-      ]
-    },
-    'Snacks': {
-      'default': [
-        MenuItemModel(name: 'Samosa with Mint Chutney', isVeg: true, calories: '260 kcal', protein: '4g', rating: 4.4, tags: ['Fried', 'Hot']),
-        MenuItemModel(name: 'Pav Bhaji', isVeg: true, calories: '390 kcal', protein: '8g', rating: 4.6, tags: ['Mumbai Style']),
-        MenuItemModel(name: 'Hot Milk / Tea', isVeg: true, calories: '110 kcal', protein: '5g', rating: 4.2, tags: ['Daily']),
-      ]
-    },
-    'Dinner': {
-      'default': [
-        MenuItemModel(name: 'Tandoori Roti & Mix Veg', isVeg: true, calories: '290 kcal', protein: '7g', rating: 4.1, tags: ['Healthy', 'Low Calorie']),
-        MenuItemModel(name: 'Egg Curry & Rice', isVeg: false, calories: '380 kcal', protein: '18g', rating: 4.5, tags: ['Non-Veg']),
-        MenuItemModel(name: 'Moong Dal Halwa', isVeg: true, calories: '240 kcal', protein: '3g', rating: 4.8, tags: ['Dessert', 'Sweet']),
-      ]
+  Future<void> fetchOrders({bool isRefresh = false}) async {
+    if (isRefresh) {
+      _currentPage = 1;
+      _hasMore = true;
+      _orders.clear();
+      if (mounted) {
+        setState(() {
+          _isFirstLoad = true;
+        });
+      }
+    } else {
+      if (!_hasMore || _isLoadingMore) return;
+      if (mounted) {
+        setState(() {
+          _isLoadingMore = true;
+        });
+      }
     }
-  };
 
-  List<MenuItemModel> _getCurrentMenu() {
-    final dayName = _weekDays[_selectedDayIndex]['day'];
-    final sessionMap = _menuDatabase[_selectedMealSession];
-    if (sessionMap == null) return [];
+    try {
+      final newOrders = await OrderService.instance.getHistory(
+        page: _currentPage,
+        limit: _limit,
+      );
 
-    // Sunday Special Lunch
-    if (_selectedMealSession == 'Lunch' && dayName == 'Sun') {
-      return sessionMap['Sun'] ?? sessionMap['default'] ?? [];
+      if (mounted) {
+        setState(() {
+          _orders.addAll(newOrders);
+          _isFirstLoad = false;
+          _isLoadingMore = false;
+          if (newOrders.length < _limit) {
+            _hasMore = false;
+          } else {
+            _currentPage++;
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Failed to load orders: $e');
+      if (mounted) {
+        setState(() {
+          _isFirstLoad = false;
+          _isLoadingMore = false;
+        });
+      }
     }
-    return sessionMap['default'] ?? [];
+  }
+
+  List<OrderHistoryItem> get _filteredOrders {
+    if (_filter == 'All') return _orders;
+    return _orders.where((order) {
+      final isDelivered = order.status.toLowerCase() == 'completed' || order.status.toLowerCase() == 'delivered';
+      if (_filter == 'Pending') {
+        return isDelivered && order.tiffinReceivedToHotel == 'pending';
+      } else {
+        return isDelivered && order.tiffinReceivedToHotel == 'received';
+      }
+    }).toList();
+  }
+
+  String _formatDateTime(DateTime dt) {
+    final months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    final day = dt.day.toString().padLeft(2, '0');
+    final month = months[dt.month - 1];
+    final year = dt.year;
+    
+    final period = dt.hour >= 12 ? 'PM' : 'AM';
+    final hourVal = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+    final hour = hourVal.toString().padLeft(2, '0');
+    final minute = dt.minute.toString().padLeft(2, '0');
+
+    return '$day $month $year • $hour:$minute $period';
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentMenu = _getCurrentMenu();
+    final displayList = _filteredOrders;
 
-    return SafeArea(
-      bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20.0, 15.0, 20.0, 0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. Title Header
-            const Text(
-              'Weekly Menu Book',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w800,
-                color: Colors.white,
-                letterSpacing: 0.5,
+    return Scaffold(
+      backgroundColor: const Color(0xFFF9FAFB),
+      body: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20.0, 15.0, 20.0, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header Title
+              const Text(
+                'Tiffin Return History',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: textDark,
+                  letterSpacing: -0.5,
+                ),
               ),
-            ),
-            Text(
-              'Plan your meals and set notification alerts.',
-              style: TextStyle(
-                fontSize: 13,
-                color: Colors.white.withOpacity(0.5),
+              const SizedBox(height: 2),
+              const Text(
+                'Track returns of tiffin boxes to your mess/hotels.',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: textGrey,
+                ),
               ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            // 2. Horizontal Calendar Date Selector
-            SizedBox(
-              height: 75,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                itemCount: _weekDays.length,
-                itemBuilder: (context, index) {
-                  final item = _weekDays[index];
-                  final isSelected = _selectedDayIndex == index;
-
-                  return GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _selectedDayIndex = index;
-                      });
-                    },
-                    child: Container(
-                      width: 55,
-                      margin: const EdgeInsets.only(right: 12),
-                      decoration: BoxDecoration(
-                        gradient: isSelected
-                            ? const LinearGradient(
-                                colors: [Color(0xFF9000FF), Color(0xFF00C6FF)],
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                              )
-                            : null,
-                        color: isSelected ? null : const Color(0xFF080F1E),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: isSelected
-                              ? const Color(0xFF00C6FF).withOpacity(0.5)
-                              : Colors.white.withOpacity(0.04),
-                          width: 1.2,
-                        ),
-                        boxShadow: isSelected
-                            ? [
-                                BoxShadow(
-                                  color: const Color(0xFF00C6FF).withOpacity(0.12),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 4),
-                                )
-                              ]
-                            : [],
+              // Filter Chips
+              Row(
+                children: ['All', 'Pending', 'Returned'].map((f) {
+                  final isSelected = _filter == f;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8.0),
+                    child: ChoiceChip(
+                      label: Text(f),
+                      selected: isSelected,
+                      onSelected: (val) {
+                        if (val) {
+                          setState(() {
+                            _filter = f;
+                          });
+                        }
+                      },
+                      selectedColor: coralPrimary.withOpacity(0.12),
+                      checkmarkColor: coralPrimary,
+                      labelStyle: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected ? coralPrimary : textGrey,
                       ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            item['day']!,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                              color: isSelected ? Colors.white : Colors.white.withOpacity(0.4),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            item['date']!,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: isSelected ? Colors.white : Colors.white.withOpacity(0.8),
-                            ),
-                          ),
-                        ],
+                      backgroundColor: Colors.white,
+                      side: BorderSide(
+                        color: isSelected ? coralPrimary : const Color(0xFFE5E7EB),
+                        width: 1.2,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
                       ),
                     ),
                   );
-                },
+                }).toList(),
               ),
-            ),
-            const SizedBox(height: 22),
+              const SizedBox(height: 16),
 
-            // 3. Meal Session Filter Selector (Breakfast, Lunch, etc.)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: _mealSessions.map((session) {
-                final isSelected = _selectedMealSession == session;
-                return GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _selectedMealSession = session;
-                    });
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: isSelected ? const Color(0xFF0F2042) : Colors.transparent,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isSelected ? const Color(0xFF00C6FF) : Colors.white.withOpacity(0.1),
-                        width: 1.0,
-                      ),
-                    ),
-                    child: Text(
-                      session,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                        color: isSelected ? Colors.white : Colors.white.withOpacity(0.4),
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 22),
-
-            // 4. Food Menu List
-            Expanded(
-              child: currentMenu.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No menu items updated for this slot.',
-                        style: TextStyle(color: Colors.white.withOpacity(0.4)),
-                      ),
-                    )
-                  : ListView.builder(
-                      physics: const BouncingScrollPhysics(),
-                      itemCount: currentMenu.length,
-                      padding: const EdgeInsets.only(bottom: 90),
-                      itemBuilder: (context, index) {
-                        final item = currentMenu[index];
-
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 14),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF080F1E).withOpacity(0.9),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.04),
-                            ),
-                          ),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              // Veg / Non-Veg Indicator Circle Dot
-                              Container(
-                                width: 22,
-                                height: 22,
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: item.isVeg ? Colors.green : Colors.red,
-                                    width: 1.5,
-                                  ),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                alignment: Alignment.center,
-                                child: Container(
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: item.isVeg ? Colors.green : Colors.red,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              
-                              // Main content (Name, nutrition, tags)
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      item.name,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Row(
+              // Orders List
+              Expanded(
+                child: _isFirstLoad
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: coralPrimary,
+                        ),
+                      )
+                    : RefreshIndicator(
+                        color: coralPrimary,
+                        onRefresh: () => fetchOrders(isRefresh: true),
+                        child: displayList.isEmpty
+                            ? ListView(
+                                children: [
+                                  Container(
+                                    height: MediaQuery.of(context).size.height * 0.5,
+                                    alignment: Alignment.center,
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
                                       children: [
-                                        Text(
-                                          '${item.calories}  •  Protein ${item.protein}',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.white.withOpacity(0.4),
+                                        Container(
+                                          padding: const EdgeInsets.all(20),
+                                          decoration: BoxDecoration(
+                                            color: coralPrimary.withOpacity(0.08),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.assignment_return_outlined,
+                                            color: coralPrimary,
+                                            size: 40,
                                           ),
                                         ),
-                                        const SizedBox(width: 8),
-                                        Icon(Icons.star_rounded, size: 12, color: Colors.amber[600]),
-                                        const SizedBox(width: 2),
+                                        const SizedBox(height: 16),
                                         Text(
-                                          item.rating.toString(),
-                                          style: TextStyle(
-                                            fontSize: 11,
+                                          'No $_filter Returns found',
+                                          style: const TextStyle(
+                                            fontSize: 16,
                                             fontWeight: FontWeight.bold,
-                                            color: Colors.amber[600],
+                                            color: textDark,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        const Text(
+                                          'Orders show tiffin return status once delivered.',
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 12.5,
+                                            color: textGrey,
                                           ),
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 6),
-                                    Wrap(
-                                      spacing: 6,
-                                      children: item.tags.map((tag) {
-                                        return Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                          decoration: BoxDecoration(
-                                            color: const Color(0xFF0D1B2A),
-                                            borderRadius: BorderRadius.circular(6),
-                                          ),
-                                          child: Text(
-                                            tag,
-                                            style: const TextStyle(
-                                              fontSize: 9,
-                                              color: Color(0xFF00C6FF),
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        );
-                                      }).toList(),
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              // Interactive Action Buttons (Like / Notify)
-                              Row(
-                                children: [
-                                  IconButton(
-                                    icon: Icon(
-                                      item.isLiked ? Icons.thumb_up_alt_rounded : Icons.thumb_up_off_alt_rounded,
-                                      size: 18,
-                                      color: item.isLiked ? const Color(0xFF00C6FF) : Colors.white.withOpacity(0.3),
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        item.isLiked = !item.isLiked;
-                                      });
-                                    },
-                                  ),
-                                  IconButton(
-                                    icon: Icon(
-                                      item.notifyMe ? Icons.notifications_active_rounded : Icons.notifications_none_rounded,
-                                      size: 18,
-                                      color: item.notifyMe ? const Color(0xFF9000FF) : Colors.white.withOpacity(0.3),
-                                    ),
-                                    onPressed: () {
-                                      setState(() {
-                                        item.notifyMe = !item.notifyMe;
-                                      });
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          backgroundColor: const Color(0xFF0D1B2A),
-                                          content: Text(
-                                            item.notifyMe
-                                                ? 'Reminder set for ${item.name}!'
-                                                : 'Reminder removed.',
-                                            style: const TextStyle(color: Color(0xFF00C6FF)),
-                                          ),
-                                          duration: const Duration(seconds: 1),
-                                        ),
-                                      );
-                                    },
                                   ),
                                 ],
+                              )
+                            : ListView.builder(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                itemCount: displayList.length + 1,
+                                padding: const EdgeInsets.only(bottom: 90),
+                                itemBuilder: (context, index) {
+                                  if (index == displayList.length) {
+                                    if (_isLoadingMore) {
+                                      return const Padding(
+                                        padding: EdgeInsets.symmetric(vertical: 16.0),
+                                        child: Center(
+                                          child: CircularProgressIndicator(color: coralPrimary),
+                                        ),
+                                      );
+                                    }
+                                    if (_hasMore) {
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 12.0),
+                                        child: Center(
+                                          child: TextButton(
+                                            onPressed: () => fetchOrders(),
+                                            style: TextButton.styleFrom(
+                                              backgroundColor: coralSoft,
+                                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.circular(12),
+                                              ),
+                                            ),
+                                            child: const Text(
+                                              'Load More',
+                                              style: TextStyle(
+                                                color: coralPrimary,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 12.5,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                    return const Padding(
+                                      padding: EdgeInsets.symmetric(vertical: 24.0),
+                                      child: Center(
+                                        child: Text(
+                                          'Showing all orders',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: textGrey,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }
+
+                                  final order = displayList[index];
+                                  final isDelivered = order.status.toLowerCase() == 'completed' || order.status.toLowerCase() == 'delivered';
+                                  final tiffinReceived = order.tiffinReceivedToHotel == 'received';
+
+                                  return Card(
+                                    margin: const EdgeInsets.only(bottom: 14),
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                      side: const BorderSide(color: Color(0xFFEEF0F4)),
+                                    ),
+                                    color: Colors.white,
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(16),
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => OrderStatusScreen(initialOrder: order),
+                                          ),
+                                        );
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(16.0),
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Container(
+                                                  padding: const EdgeInsets.all(10),
+                                                  decoration: BoxDecoration(
+                                                    color: coralPrimary.withOpacity(0.08),
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.storefront_rounded,
+                                                    color: coralPrimary,
+                                                    size: 18,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 12),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Text(
+                                                        order.hotelName,
+                                                        style: const TextStyle(
+                                                          fontSize: 14.5,
+                                                          fontWeight: FontWeight.bold,
+                                                          color: textDark,
+                                                        ),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                      const SizedBox(height: 3),
+                                                      Text(
+                                                        _formatDateTime(order.createdAt),
+                                                        style: const TextStyle(
+                                                          fontSize: 11,
+                                                          color: textGrey,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(height: 1),
+                                                      Text(
+                                                        'Order #${order.orderId} • ${order.itemCount} items',
+                                                        style: const TextStyle(
+                                                          fontSize: 11,
+                                                          color: textGrey,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Column(
+                                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                                  children: [
+                                                    Text(
+                                                      '₹${order.grandTotal}',
+                                                      style: const TextStyle(
+                                                        fontSize: 14.5,
+                                                        fontWeight: FontWeight.w900,
+                                                        color: textDark,
+                                                      ),
+                                                    ),
+                                                    const SizedBox(height: 6),
+                                                    _buildTiffinStatusBadge(isDelivered, tiffinReceived),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTiffinStatusBadge(bool isDelivered, bool tiffinReceived) {
+    if (!isDelivered) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.grey[100],
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: Text(
+          'Order Active',
+          style: TextStyle(
+            color: Colors.grey[600],
+            fontSize: 9.5,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      );
+    }
+
+    if (tiffinReceived) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: emeraldGreen.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Icon(Icons.check_circle_outline_rounded, size: 11, color: emeraldGreen),
+            SizedBox(width: 4),
+            Text(
+              'Returned',
+              style: TextStyle(
+                color: emeraldGreen,
+                fontSize: 9.5,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: amberYellow.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(30),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Icon(Icons.warning_amber_rounded, size: 11, color: amberYellow),
+          SizedBox(width: 4),
+          Text(
+            'Pending',
+            style: TextStyle(
+              color: amberYellow,
+              fontSize: 9.5,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
       ),
     );
   }

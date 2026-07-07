@@ -108,4 +108,33 @@ class DriverOrderService {
       return false;
     }
   }
+
+  Future<Map<String, dynamic>> verifyTiffinOtp({
+    required int orderId,
+    required String otp,
+  }) async {
+    try {
+      final token = await DriverAuthService.instance.getSavedToken();
+      if (token == null) {
+        return {'success': false, 'message': 'No driver token found.'};
+      }
+
+      final response = await http.post(
+        Uri.parse('$_baseUrl/tiffin_verify'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode({
+          'order_id': orderId,
+          'otp': otp,
+        }),
+      ).timeout(_timeout);
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return body;
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to verify OTP: $e'};
+    }
+  }
 }

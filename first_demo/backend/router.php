@@ -43,7 +43,8 @@ $routes = [
     'GET  /api/driver/me'            => __DIR__ . '/api/driver/me.php',
     'POST /api/driver/status'        => __DIR__ . '/api/driver/status.php',
     'GET  /api/driver/orders'        => __DIR__ . '/api/driver/orders/list.php',
-    'POST /api/driver/orders/status' => __DIR__ . '/api/driver/orders/status.php',
+    'POST /api/driver/orders/status'        => __DIR__ . '/api/driver/orders/status.php',
+    'POST /api/driver/orders/tiffin_verify' => __DIR__ . '/api/driver/orders/tiffin_verify.php',
 
     // ── Hotels (public) ───────────────────────────────────────────────────
     'GET  /api/hotels/nearby' => __DIR__ . '/api/hotels/nearby.php',

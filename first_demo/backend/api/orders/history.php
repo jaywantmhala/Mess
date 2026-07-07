@@ -38,6 +38,7 @@ try {
             o.grand_total,
             o.wallet_deducted,
             o.created_at,
+            o.tiffin_received_to_hotel,
             COUNT(oi.order_item_id) AS item_count
          FROM orders o
          JOIN hotels      h  ON h.id  = o.hotel_id
@@ -45,7 +46,7 @@ try {
          WHERE o.customer_id = ?
          GROUP BY
             o.order_id, h.hotel_name, o.status,
-            o.grand_total, o.wallet_deducted, o.created_at
+            o.grand_total, o.wallet_deducted, o.created_at, o.tiffin_received_to_hotel
          ORDER BY o.created_at DESC
          LIMIT ? OFFSET ?"
     );
@@ -54,13 +55,14 @@ try {
 
     $orders = array_map(function ($row) {
         return [
-            'order_id'        => (int)    $row['order_id'],
-            'hotel_name'      =>          $row['hotel_name'],
-            'status'          =>          $row['status'],
-            'grand_total'     => number_format((float) $row['grand_total'],     2, '.', ''),
-            'wallet_deducted' => number_format((float) $row['wallet_deducted'], 2, '.', ''),
-            'item_count'      => (int)    $row['item_count'],
-            'created_at'      =>          $row['created_at'],
+            'order_id'                  => (int)    $row['order_id'],
+            'hotel_name'                =>          $row['hotel_name'],
+            'status'                    =>          $row['status'],
+            'grand_total'               => number_format((float) $row['grand_total'],     2, '.', ''),
+            'wallet_deducted'           => number_format((float) $row['wallet_deducted'], 2, '.', ''),
+            'item_count'                => (int)    $row['item_count'],
+            'created_at'                =>          $row['created_at'],
+            'tiffin_received_to_hotel'  =>          $row['tiffin_received_to_hotel'],
         ];
     }, $rows);
 

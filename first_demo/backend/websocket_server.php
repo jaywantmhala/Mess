@@ -207,6 +207,97 @@ while (true) {
                             }
                         }
                     }
+                    elseif ($event === 'PENDING_TIFFIN_RETURN') {
+                        $previousOrderId = (int)($eventData['previous_order_id'] ?? 0);
+                        $currentOrderId = (int)($eventData['current_order_id'] ?? 0);
+                        $customerId = (int)($eventData['customer_id'] ?? 0);
+                        $driverId = (int)($eventData['driver_id'] ?? 0);
+                        $hotelId = (int)($eventData['hotel_id'] ?? 0);
+                        $hotelName = $eventData['hotel_name'] ?? 'Restaurant';
+                        $otp = $eventData['otp'] ?? '';
+
+                        echo "Broadcasting PENDING_TIFFIN_RETURN for order #$previousOrderId (Driver: $driverId, Customer: $customerId)\n";
+
+                        // Send to Customer (WITH OTP)
+                        foreach ($socket_metadata as $sid => $meta) {
+                            if ($meta['role'] === 'customer' && (int)$meta['id'] === $customerId) {
+                                $idx = array_search($sid, array_map('intval', $sockets));
+                                if ($idx !== false) {
+                                    $cust_socket = $sockets[$idx];
+                                    $msg = json_encode([
+                                        'event' => 'PENDING_TIFFIN_RETURN',
+                                        'data' => [
+                                            'previous_order_id' => $previousOrderId,
+                                            'current_order_id' => $currentOrderId,
+                                            'hotel_id' => $hotelId,
+                                            'hotel_name' => $hotelName,
+                                            'otp' => $otp
+                                        ]
+                                    ]);
+                                    @fwrite($cust_socket, encodeFrame($msg));
+                                    echo "Pushed PENDING_TIFFIN_RETURN to customer socket #$sid\n";
+                                }
+                            }
+                        }
+
+                        // Send to Driver (WITHOUT OTP)
+                        foreach ($socket_metadata as $sid => $meta) {
+                            if ($meta['role'] === 'driver' && (int)$meta['id'] === $driverId) {
+                                $idx = array_search($sid, array_map('intval', $sockets));
+                                if ($idx !== false) {
+                                    $driver_socket = $sockets[$idx];
+                                    $msg = json_encode([
+                                        'event' => 'PENDING_TIFFIN_RETURN',
+                                        'data' => [
+                                            'previous_order_id' => $previousOrderId,
+                                            'current_order_id' => $currentOrderId,
+                                            'hotel_id' => $hotelId,
+                                            'hotel_name' => $hotelName
+                                        ]
+                                    ]);
+                                    @fwrite($driver_socket, encodeFrame($msg));
+                                    echo "Pushed PENDING_TIFFIN_RETURN to driver socket #$sid\n";
+                                }
+                            }
+                        }
+                    }
+                    elseif ($event === 'TIFFIN_RETURN_CONFIRMED') {
+                        $orderId = (int)($eventData['order_id'] ?? 0);
+                        $customerId = (int)($eventData['customer_id'] ?? 0);
+                        $driverId = (int)($eventData['driver_id'] ?? 0);
+
+                        echo "Broadcasting TIFFIN_RETURN_CONFIRMED for order #$orderId\n";
+
+                        // Notify Customer
+                        foreach ($socket_metadata as $sid => $meta) {
+                            if ($meta['role'] === 'customer' && (int)$meta['id'] === $customerId) {
+                                $idx = array_search($sid, array_map('intval', $sockets));
+                                if ($idx !== false) {
+                                    $msg = json_encode([
+                                        'event' => 'TIFFIN_RETURN_CONFIRMED',
+                                        'data' => ['order_id' => $orderId]
+                                    ]);
+                                    @fwrite($sockets[$idx], encodeFrame($msg));
+                                    echo "Pushed TIFFIN_RETURN_CONFIRMED to customer socket #$sid\n";
+                                }
+                            }
+                        }
+
+                        // Notify Driver
+                        foreach ($socket_metadata as $sid => $meta) {
+                            if ($meta['role'] === 'driver' && (int)$meta['id'] === $driverId) {
+                                $idx = array_search($sid, array_map('intval', $sockets));
+                                if ($idx !== false) {
+                                    $msg = json_encode([
+                                        'event' => 'TIFFIN_RETURN_CONFIRMED',
+                                        'data' => ['order_id' => $orderId]
+                                    ]);
+                                    @fwrite($sockets[$idx], encodeFrame($msg));
+                                    echo "Pushed TIFFIN_RETURN_CONFIRMED to driver socket #$sid\n";
+                                }
+                            }
+                        }
+                    }
                     elseif ($event === 'ORDER_ASSIGNED') {
                         $orderId = (int)($eventData['order_id'] ?? 0);
                         $driverId = (int)($eventData['driver_id'] ?? 0);

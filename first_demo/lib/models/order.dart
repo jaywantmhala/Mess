@@ -35,6 +35,7 @@ class OrderHistoryItem {
   final double walletDeducted;
   final int itemCount;
   final DateTime createdAt;
+  final String tiffinReceivedToHotel;
 
   const OrderHistoryItem({
     required this.orderId,
@@ -44,6 +45,7 @@ class OrderHistoryItem {
     required this.walletDeducted,
     required this.itemCount,
     required this.createdAt,
+    this.tiffinReceivedToHotel = 'pending',
   });
 
   factory OrderHistoryItem.fromJson(Map<String, dynamic> json) =>
@@ -56,6 +58,7 @@ class OrderHistoryItem {
         itemCount: int.parse(json['item_count'].toString()),
         createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
             DateTime.now(),
+        tiffinReceivedToHotel: json['tiffin_received_to_hotel'] as String? ?? 'pending',
       );
 }
 

@@ -21,7 +21,9 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
   late PageController _pageController;
   late List<Widget> _tabs;
   OverlayEntry? _assignmentOverlay;
+  OverlayEntry? _tiffinOverlay;
   StreamSubscription? _wsSubscription;
+  final TextEditingController _tiffinOtpController = TextEditingController();
 
   // GlobalKey so we can call reload() on DriverOrdersTab when a new order arrives
   final GlobalKey<DriverOrdersTabState> _ordersTabKey = GlobalKey<DriverOrdersTabState>();
@@ -72,16 +74,343 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
     _startWSListener();
   }
 
+  bool _isShowingTiffinDialog = false;
+
   void _startWSListener() {
     _wsSubscription = WebSocketService.instance.messages.listen((msg) {
-      final event = msg['event'] as String?;
-      final eventData = msg['data'];
-      if (eventData == null) return;
+      try {
+        final event = msg['event'] as String?;
+        final eventData = msg['data'];
+        
+        debugPrint('DriverHomeShell: Received WebSocket event: $event');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Received WebSocket Event: $event'),
+              backgroundColor: Colors.blueGrey,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
 
-      if (event == 'ORDER_ASSIGNED') {
-        _showAssignmentNotification(eventData);
+        if (eventData == null) return;
+
+        if (event == 'ORDER_ASSIGNED') {
+          _showAssignmentNotification(eventData);
+        } else if (event == 'PENDING_TIFFIN_RETURN') {
+          _showTiffinReturnPopup(eventData);
+        } else if (event == 'TIFFIN_RETURN_CONFIRMED') {
+          _dismissTiffinReturnPopup();
+        }
+      } catch (e, stack) {
+        debugPrint('DriverHomeShell WS Listener Error: $e\n$stack');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('WS Listener Error: $e'),
+              backgroundColor: AppColors.error,
+              duration: const Duration(seconds: 8),
+            ),
+          );
+        }
       }
     });
+  }
+
+  void _showTiffinReturnPopup(dynamic data) {
+    debugPrint('DriverHomeShell: _showTiffinReturnPopup called with: $data');
+    try {
+      if (!mounted) {
+        debugPrint('DriverHomeShell: Not mounted, skipping dialog.');
+        return;
+      }
+      
+      final previousOrderId = data['previous_order_id'] ?? 0;
+      final hotelName = data['hotel_name']?.toString() ?? 'Restaurant';
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+
+        if (_tiffinOverlay != null) {
+          debugPrint('DriverHomeShell: Overlay already showing, removing old one.');
+          _tiffinOverlay?.remove();
+          _tiffinOverlay = null;
+        }
+
+        // Clear OTP controller before displaying
+        _tiffinOtpController.clear();
+
+        _tiffinOverlay = OverlayEntry(
+          builder: (context) {
+            bool isVerifying = false;
+            String? errorMessage;
+
+            return Positioned.fill(
+              child: StatefulBuilder(
+                builder: (context, setState) {
+                  return Stack(
+                    children: [
+                      // Full-screen blurred backdrop
+                      BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                        child: Container(
+                          color: Colors.black.withOpacity(0.55),
+                        ),
+                      ),
+                      // Centered Popup Card
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF151522),
+                                borderRadius: BorderRadius.circular(24),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.08),
+                                  width: 1,
+                                ),
+                              ),
+                              padding: const EdgeInsets.all(24.0),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(14),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withOpacity(0.15),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.assignment_return_rounded,
+                                      color: AppColors.primary,
+                                      size: 32,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 18),
+                                  const Text(
+                                    'Collect Tiffin Box',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w900,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Collect the pending tiffin box from the customer and enter the 4-digit OTP displayed on their screen.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.white.withOpacity(0.6),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+
+                                  // Details Card
+                                  Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(0.04),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: Colors.white.withOpacity(0.08),
+                                      ),
+                                    ),
+                                    child: Column(
+                                      children: [
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              'Hotel:',
+                                              style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+                                            ),
+                                            Text(
+                                              hotelName,
+                                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            Text(
+                                              'Prev Order ID:',
+                                              style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+                                            ),
+                                            Text(
+                                              '#$previousOrderId',
+                                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+
+                                  // OTP TextField
+                                  TextField(
+                                    controller: _tiffinOtpController,
+                                    keyboardType: TextInputType.number,
+                                    maxLength: 4,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 8,
+                                    ),
+                                    decoration: InputDecoration(
+                                      hintText: '0000',
+                                      hintStyle: TextStyle(
+                                        color: Colors.white.withOpacity(0.2),
+                                        letterSpacing: 8,
+                                      ),
+                                      counterText: '',
+                                      filled: true,
+                                      fillColor: Colors.white.withOpacity(0.04),
+                                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
+                                      enabledBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(16),
+                                        borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                                      ),
+                                    ),
+                                  ),
+                                  if (errorMessage != null) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      errorMessage!,
+                                      style: const TextStyle(color: AppColors.error, fontSize: 12, fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                  const SizedBox(height: 24),
+
+                                  // Verify Button
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: AppColors.primary,
+                                        foregroundColor: Colors.white,
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(16),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(vertical: 14),
+                                      ),
+                                      onPressed: isVerifying
+                                          ? null
+                                          : () async {
+                                              final enteredOtp = _tiffinOtpController.text.trim();
+                                              if (enteredOtp.length < 4) {
+                                                setState(() {
+                                                  errorMessage = 'Please enter a 4-digit OTP.';
+                                                });
+                                                return;
+                                              }
+
+                                              setState(() {
+                                                isVerifying = true;
+                                                errorMessage = null;
+                                              });
+
+                                              final res = await DriverOrderService.instance.verifyTiffinOtp(
+                                                orderId: previousOrderId,
+                                                otp: enteredOtp,
+                                              );
+
+                                              if (res['success'] == true) {
+                                                _dismissTiffinReturnPopup();
+                                              } else {
+                                                setState(() {
+                                                  isVerifying = false;
+                                                  errorMessage = res['message'] ?? 'Verification failed. Try again.';
+                                                });
+                                              }
+                                            },
+                                      child: isVerifying
+                                          ? const SizedBox(
+                                              width: 20,
+                                              height: 20,
+                                              child: CircularProgressIndicator(
+                                                color: Colors.white,
+                                                strokeWidth: 2,
+                                              ),
+                                            )
+                                          : const Text(
+                                              'Verify OTP',
+                                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                            ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            );
+          },
+        );
+
+        final overlayState = Overlay.of(context);
+        overlayState.insert(_tiffinOverlay!);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Tiffin return overlay inserted successfully!'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+      });
+
+    } catch (e, stack) {
+      debugPrint('DriverHomeShell _showTiffinReturnPopup error: $e\n$stack');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Overlay Show Error: $e'),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 8),
+          ),
+        );
+      }
+    }
+  }
+
+  void _dismissTiffinReturnPopup() {
+    if (_tiffinOverlay != null) {
+      _tiffinOverlay?.remove();
+      _tiffinOverlay = null;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle_rounded, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Tiffin return verified successfully!'),
+            ],
+          ),
+          backgroundColor: AppColors.success,
+        ),
+      );
+
+      _ordersTabKey.currentState?.reload();
+    }
   }
 
   void _showAssignmentNotification(dynamic orderData) {
@@ -177,6 +506,7 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
 
   @override
   void dispose() {
+    _tiffinOtpController.dispose();
     WebSocketService.instance.stopAlertSound();
     _assignmentOverlay?.remove();
     _assignmentOverlay = null;

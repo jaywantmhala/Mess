@@ -40,23 +40,27 @@ class _HomeShellState extends State<HomeShell>
   OverlayEntry? _assignmentOverlay;
   StreamSubscription? _wsSubscription;
 
+  final GlobalKey<MenuTabState> _menuTabKey = GlobalKey<MenuTabState>();
+  bool _isShowingTiffinDialog = false;
+
   static const _navItems = [
     _NavItem(icon: Icons.home_rounded,              label: 'Home'),
-    _NavItem(icon: Icons.restaurant_menu_rounded,   label: 'Menu'),
+    _NavItem(icon: Icons.assignment_return_rounded, label: 'Tiffin Return History'),
     _NavItem(icon: Icons.receipt_long_rounded,      label: 'Ledger'),
     _NavItem(icon: Icons.account_circle_rounded,    label: 'Profile'),
   ];
 
-  static const _tabs = [
-    HotelLocatorDashboard(),
-    MenuTab(),
-    AnalyticsTab(),
-    ProfileTab(),
-  ];
+  late final List<Widget> _tabs;
 
   @override
   void initState() {
     super.initState();
+    _tabs = [
+      const HotelLocatorDashboard(),
+      MenuTab(key: _menuTabKey),
+      const AnalyticsTab(),
+      const ProfileTab(),
+    ];
     _pageController = PageController(initialPage: 0);
     _entryCtrl = AnimationController(
       vsync: this,
@@ -68,13 +72,22 @@ class _HomeShellState extends State<HomeShell>
     // Establish WebSocket Connection
     WebSocketService.instance.connect();
 
-    // Listen for ORDER_ASSIGNED events to show driver notification overlay
+    // Listen for real-time WebSocket notifications
     _wsSubscription = WebSocketService.instance.messages.listen((msg) {
       final event = msg['event'] as String?;
+      final data = msg['data'];
+
       if (event == 'ORDER_ASSIGNED') {
-        final data = msg['data'];
         if (data != null && mounted) {
           _showAssignmentOverlay(data);
+        }
+      } else if (event == 'PENDING_TIFFIN_RETURN') {
+        if (data != null && mounted) {
+          _showTiffinReturnPopup(data);
+        }
+      } else if (event == 'TIFFIN_RETURN_CONFIRMED') {
+        if (data != null && mounted) {
+          _dismissTiffinReturnPopup(data);
         }
       }
     });
@@ -90,6 +103,187 @@ class _HomeShellState extends State<HomeShell>
     _entryCtrl.dispose();
     WebSocketService.instance.disconnect();
     super.dispose();
+  }
+
+  void _showTiffinReturnPopup(dynamic data) {
+    if (!mounted) return;
+    
+    final previousOrderId = data['previous_order_id'] ?? 0;
+    final hotelName = data['hotel_name']?.toString() ?? 'Restaurant';
+    final otp = data['otp']?.toString() ?? '';
+
+    // If dialog is already showing, close it first
+    if (_isShowingTiffinDialog) {
+      Navigator.of(context, rootNavigator: true).pop();
+      _isShowingTiffinDialog = false;
+    }
+
+    _isShowingTiffinDialog = true;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) {
+        return WillPopScope(
+          onWillPop: () async => false, // Customer cannot dismiss until driver verifies
+          child: Dialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            backgroundColor: const Color(0xFF0F172A),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF59E0B).withOpacity(0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.assignment_return_rounded,
+                      color: Color(0xFFF59E0B),
+                      size: 32,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'Tiffin Return Required',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Please return the tiffin box from your previous order to the driver.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.white.withOpacity(0.6),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  // Details Container
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.04),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.08),
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Hotel:',
+                              style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+                            ),
+                            Text(
+                              hotelName,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Previous Order ID:',
+                              style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+                            ),
+                            Text(
+                              '#$previousOrderId',
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // OTP Code Header
+                  Text(
+                    'SHARE THIS OTP WITH DRIVER',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white.withOpacity(0.4),
+                      letterSpacing: 1.0,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  
+                  // OTP Boxes
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8614A).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: const Color(0xFFE8614A).withOpacity(0.4),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Text(
+                      otp,
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFFE8614A),
+                        letterSpacing: 8,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Waiting for driver verification...',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.white.withOpacity(0.4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _dismissTiffinReturnPopup(dynamic data) {
+    if (_isShowingTiffinDialog && mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+      _isShowingTiffinDialog = false;
+      
+      // Show success SnackBar
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(
+            children: [
+              Icon(Icons.check_circle_rounded, color: Colors.white),
+              SizedBox(width: 8),
+              Text('Tiffin returned successfully!'),
+            ],
+          ),
+          backgroundColor: Color(0xFF10B981),
+        ),
+      );
+
+      // Trigger hot reload of history tab (second tab)
+      _menuTabKey.currentState?.fetchOrders(isRefresh: true);
+    }
   }
 
   void _showAssignmentOverlay(dynamic data) {

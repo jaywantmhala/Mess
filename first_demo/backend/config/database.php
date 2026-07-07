@@ -301,4 +301,40 @@ function createTables(PDO $pdo): void {
     try {
         $pdo->exec("ALTER TABLE `orders` ADD CONSTRAINT `fk_order_driver` FOREIGN KEY (`driver_id`) REFERENCES `drivers` (`id`) ON DELETE SET NULL");
     } catch (PDOException $e) {}
+
+    // Add tiffin return tracking columns to orders
+    try {
+        $pdo->exec("ALTER TABLE `orders` ADD COLUMN `tiffin_received_to_hotel` VARCHAR(50) NOT NULL DEFAULT 'pending'");
+    } catch (PDOException $e) {}
+
+    try {
+        $pdo->exec("ALTER TABLE `orders` ADD COLUMN `tiffin_return_otp` VARCHAR(4) DEFAULT NULL");
+    } catch (PDOException $e) {}
+
+    try {
+        $pdo->exec("ALTER TABLE `orders` ADD COLUMN `tiffin_returned_driver_id` INT UNSIGNED DEFAULT NULL");
+    } catch (PDOException $e) {}
+
+    try {
+        $pdo->exec("ALTER TABLE `orders` ADD COLUMN `tiffin_returned_at` DATETIME DEFAULT NULL");
+    } catch (PDOException $e) {}
+
+    // Create tiffin_return_logs table
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS `tiffin_return_logs` (
+            `id`                      INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+            `order_id`                INT UNSIGNED  NOT NULL,
+            `driver_id`               INT UNSIGNED  NOT NULL,
+            `customer_id`             INT UNSIGNED  NOT NULL,
+            `hotel_id`                INT UNSIGNED  NOT NULL,
+            `otp`                     VARCHAR(4)    NOT NULL,
+            `verified_at`             DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            `log_details`             TEXT          DEFAULT NULL,
+            PRIMARY KEY (`id`),
+            CONSTRAINT `fk_tiffin_order` FOREIGN KEY (`order_id`) REFERENCES `orders` (`order_id`) ON DELETE CASCADE,
+            CONSTRAINT `fk_tiffin_driver` FOREIGN KEY (`driver_id`) REFERENCES `drivers` (`id`) ON DELETE CASCADE,
+            CONSTRAINT `fk_tiffin_customer` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`) ON DELETE CASCADE,
+            CONSTRAINT `fk_tiffin_hotel` FOREIGN KEY (`hotel_id`) REFERENCES `hotels` (`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
 }

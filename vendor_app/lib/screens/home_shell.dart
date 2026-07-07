@@ -205,21 +205,15 @@ class _HomeShellState extends State<HomeShell> with TickerProviderStateMixin {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
-          ),
-        ],
+        boxShadow: AppShadows.navbar,
       ),
       child: SafeArea(
         top: false,
         child: Container(
-          height: 65,
+          height: 68,
           padding: EdgeInsets.symmetric(horizontal: hPad),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: List.generate(_navItems.length, (i) {
               return _buildNavItem(i, _navItems[i]);
             }),
@@ -245,47 +239,45 @@ class _HomeShellState extends State<HomeShell> with TickerProviderStateMixin {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Pill indicator + icon
+              // Gradient pill for selected, plain for unselected
               AnimatedContainer(
-                duration: const Duration(milliseconds: 280),
+                duration: const Duration(milliseconds: 300),
                 curve: Curves.easeOutCubic,
-                width: isSelected ? 56 : 40,
-                height: 32,
+                width: isSelected ? 60 : 44,
+                height: 36,
                 decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppColors.primarySurface
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(16),
+                  gradient: isSelected ? AppColors.primaryGradient : null,
+                  color: isSelected ? null : Colors.transparent,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: isSelected
+                      ? [BoxShadow(
+                          color: AppColors.primary.withOpacity(0.30),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        )]
+                      : [],
                 ),
                 child: Center(
                   child: AnimatedSwitcher(
                     duration: const Duration(milliseconds: 200),
-                    transitionBuilder: (child, anim) => ScaleTransition(
-                      scale: anim,
-                      child: child,
-                    ),
+                    transitionBuilder: (child, anim) =>
+                        ScaleTransition(scale: anim, child: child),
                     child: Icon(
                       isSelected ? item.activeIcon : item.icon,
                       key: ValueKey('${item.label}_$isSelected'),
-                      size: isSelected ? 24 : 24,
-                      color: isSelected
-                          ? AppColors.primary
-                          : AppColors.textHint,
+                      size: 22,
+                      color: isSelected ? Colors.white : AppColors.textHint,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 4),
-              // Label
+              const SizedBox(height: 5),
               AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 200),
                 style: TextStyle(
-                  fontSize: isSelected ? 11 : 10,
-                  fontWeight:
-                      isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected
-                      ? AppColors.primary
-                      : AppColors.textHint,
+                  fontSize: 10,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  color: isSelected ? AppColors.primary : AppColors.textHint,
                   letterSpacing: 0.1,
                 ),
                 child: Text(item.label),

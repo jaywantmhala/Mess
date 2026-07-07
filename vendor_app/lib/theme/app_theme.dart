@@ -5,57 +5,85 @@ import 'package:flutter/material.dart';
 class AppColors {
   AppColors._();
 
-  // Primary vibrant food red
+  // Primary — Zomato/Swiggy fire red
   static const primary = Color(0xFFE23744);
-  static const primaryDeep = Color(0xFFCB202D);
-  static const primaryLight = Color(0xFFFF6975);
-  static const primarySurface = Color(0xFFFCEAEB);
+  static const primaryDeep = Color(0xFFC0392B);
+  static const primaryLight = Color(0xFFFF6B6B);
+  static const primarySurface = Color(0xFFFFF0F0);
 
-  // Accent
-  static const accent = Color(0xFFF9A825);
-  static const accentSurface = Color(0xFFFFF6E5);
+  // Warm orange accent — Swiggy-inspired
+  static const accent = Color(0xFFFC8019);
+  static const accentDeep = Color(0xFFE5701A);
+  static const accentLight = Color(0xFFFFB347);
+  static const accentSurface = Color(0xFFFFF3E8);
 
   // Neutrals
-  static const ink = Color(0xFF0F0F1A);
-  static const inkSoft = Color(0xFF1E1E2E);
-  static const inkMid = Color(0xFF3A3A4E);
-  static const textSecondary = Color(0xFF6E6E85);
-  static const textHint = Color(0xFFA0A0B8);
+  static const ink = Color(0xFF1C1C1E);
+  static const inkSoft = Color(0xFF2C2C2E);
+  static const inkMid = Color(0xFF48484A);
+  static const textSecondary = Color(0xFF6C6C70);
+  static const textHint = Color(0xFFAEAEB2);
 
   // Surfaces
-  static const surface = Color(0xFFFAFBFF);
+  static const surface = Color(0xFFF8F8F8);
   static const surfaceCard = Color(0xFFFFFFFF);
-  static const surfaceElevated = Color(0xFFF4F5FF);
+  static const surfaceElevated = Color(0xFFF2F2F7);
 
   // Borders
-  static const border = Color(0xFFE8E8F0);
+  static const border = Color(0xFFE5E5EA);
   static const borderFocus = primary;
 
   // Status
-  static const success = Color(0xFF10B981);
-  static const successSurface = Color(0xFFECFDF5);
-  static const error = Color(0xFFEF4444);
-  static const errorSurface = Color(0xFFFEF2F2);
-  static const warning = Color(0xFFF59E0B);
+  static const success = Color(0xFF34C759);
+  static const successSurface = Color(0xFFEAFAF0);
+  static const error = Color(0xFFFF3B30);
+  static const errorSurface = Color(0xFFFFF0EF);
+  static const warning = Color(0xFFFF9500);
+  static const warningSurface = Color(0xFFFFF5E6);
 
-  // Gradient
+  // ── Gradients ──────────────────────────────────────────────────────────────
+
+  /// Main brand gradient — Zomato deep red → coral
   static const primaryGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [primary, primaryDeep],
+    colors: [Color(0xFFE23744), Color(0xFFC0392B)],
   );
 
+  /// Hero header gradient — rich crimson diagonal
   static const heroGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    stops: [0.0, 0.5, 1.0],
-    colors: [Color(0xFFE23744), Color(0xFFD32F2F), Color(0xFFC62828)],
+    stops: [0.0, 0.55, 1.0],
+    colors: [Color(0xFFFF4C5B), Color(0xFFE23744), Color(0xFFC0392B)],
   );
 
+  /// Orange accent gradient — Swiggy-inspired warm
+  static const accentGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFFFC8019), Color(0xFFE5701A)],
+  );
+
+  /// Sunset — red → orange for hero banners
+  static const sunsetGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFFE23744), Color(0xFFFC8019)],
+  );
+
+  /// Card tint gradient (subtle, white overlay for card depth)
   static const cardGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFE23744), Color(0xFFFF6975)],
+    colors: [Color(0xFFFF6B6B), Color(0xFFE23744)],
+  );
+
+  /// Stats gradient — teal for revenue / insights
+  static const statsGradient = LinearGradient(
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+    colors: [Color(0xFF00B894), Color(0xFF00CEC9)],
   );
 }
 
@@ -144,7 +172,8 @@ class AppInputDecoration {
       suffixIcon: suffix,
       filled: true,
       fillColor: AppColors.surfaceCard,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
         borderSide: const BorderSide(color: AppColors.border, width: 1.5),
@@ -155,7 +184,8 @@ class AppInputDecoration {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
-        borderSide: const BorderSide(color: AppColors.borderFocus, width: 2.0),
+        borderSide:
+            const BorderSide(color: AppColors.borderFocus, width: 2.0),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
@@ -180,33 +210,48 @@ class AppShadows {
 
   static const card = [
     BoxShadow(
-      color: Color(0x0C0F0F1A),
-      blurRadius: 24,
-      offset: Offset(0, 8),
+      color: Color(0x0A1C1C1E),
+      blurRadius: 20,
+      offset: Offset(0, 4),
       spreadRadius: 0,
     ),
     BoxShadow(
-      color: Color(0x080F0F1A),
-      blurRadius: 8,
-      offset: Offset(0, 4),
+      color: Color(0x061C1C1E),
+      blurRadius: 6,
+      offset: Offset(0, 2),
       spreadRadius: 0,
     ),
   ];
 
   static const elevated = [
     BoxShadow(
-      color: Color(0x14FF6B6B),
+      color: Color(0x28E23744),
       blurRadius: 24,
       offset: Offset(0, 8),
       spreadRadius: 0,
     ),
   ];
 
+  static const accentElevated = [
+    BoxShadow(
+      color: Color(0x30FC8019),
+      blurRadius: 20,
+      offset: Offset(0, 6),
+      spreadRadius: 0,
+    ),
+  ];
+
   static const navbar = [
     BoxShadow(
-      color: Color(0x180F0F1A),
-      blurRadius: 32,
-      offset: Offset(0, -4),
+      color: Color(0x141C1C1E),
+      blurRadius: 24,
+      offset: Offset(0, -3),
+      spreadRadius: 0,
+    ),
+    BoxShadow(
+      color: Color(0x081C1C1E),
+      blurRadius: 8,
+      offset: Offset(0, -1),
       spreadRadius: 0,
     ),
   ];
@@ -226,7 +271,6 @@ class AppTheme {
           surface: AppColors.surface,
           error: AppColors.error,
         ),
-        // Uses system default font (Roboto on Android, SF Pro on iOS)
         appBarTheme: const AppBarTheme(
           backgroundColor: AppColors.surfaceCard,
           elevation: 0,
@@ -263,7 +307,6 @@ class AppTheme {
               borderRadius: BorderRadius.circular(18),
             ),
             textStyle: const TextStyle(
-              fontFamily: 'Outfit',
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
@@ -284,14 +327,14 @@ class AppTheme {
 class Responsive {
   Responsive._();
 
-  static bool isPhone(BuildContext ctx) => MediaQuery.of(ctx).size.width < 600;
+  static bool isPhone(BuildContext ctx) =>
+      MediaQuery.of(ctx).size.width < 600;
   static bool isTablet(BuildContext ctx) =>
       MediaQuery.of(ctx).size.width >= 600 &&
       MediaQuery.of(ctx).size.width < 1024;
   static bool isDesktop(BuildContext ctx) =>
       MediaQuery.of(ctx).size.width >= 1024;
 
-  /// Horizontal padding: phone → 20, tablet → 10% of width, desktop → 15% of width
   static double hPad(BuildContext ctx) {
     final w = MediaQuery.of(ctx).size.width;
     if (w < 600) return 20.0;
@@ -299,7 +342,6 @@ class Responsive {
     return w * 0.15;
   }
 
-  /// Max-content width for large screens
   static double maxWidth(BuildContext ctx) {
     final w = MediaQuery.of(ctx).size.width;
     return w > 640 ? 640.0 : w;

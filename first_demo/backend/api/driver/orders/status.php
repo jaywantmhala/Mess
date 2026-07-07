@@ -113,6 +113,24 @@ try {
             @fclose($fp);
         }
 
+        // Send FCM Notifications
+        require_once __DIR__ . '/../../../helpers/fcm.php';
+
+        $statusBody = "Your order #$orderId status has changed to: $status";
+        if ($status === 'accepted_by_driver') {
+            $statusBody = "Driver has accepted your order #$orderId.";
+        } elseif ($status === 'picked_up') {
+            $statusBody = "Your order #$orderId has been picked up and is on the way.";
+        } elseif ($status === 'completed') {
+            $statusBody = "Your order #$orderId has been delivered.";
+        }
+
+        FcmHelper::sendToCustomer($customerId, "Order Status Update", $statusBody, [
+            'order_id' => $orderId,
+            'event' => 'ORDER_STATUS_UPDATED',
+            'status' => $status
+        ]);
+
         // If there's a pending tiffin, send the PENDING_TIFFIN_RETURN event in a new connection
         if ($hasPendingTiffin && $pendingTiffinOrder) {
             // Fetch hotel name
@@ -139,9 +157,17 @@ try {
                 @fwrite($fpTiffin, json_encode($tiffinNotification));
                 @fclose($fpTiffin);
             }
+
+            // Send FCM push to Customer with OTP
+            FcmHelper::sendToCustomer($customerId, "Tiffin Return OTP", "Please share OTP " . $pendingTiffinOrder['otp'] . " with the driver to return your empty tiffin from $hotelName.", [
+                'order_id' => $orderId,
+                'previous_order_id' => $pendingTiffinOrder['order_id'],
+                'event' => 'PENDING_TIFFIN_RETURN',
+                'otp' => $pendingTiffinOrder['otp']
+            ]);
         }
     } catch (Exception $e) {
-        // Suppress WebSocket notification error to avoid blocking the REST response
+        // Suppress WebSocket/FCM notification error to avoid blocking the REST response
     }
 
     sendSuccess('Order status updated successfully.', [

@@ -50,8 +50,12 @@ function getDBConnection(): PDO {
                 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     $pdo->exec("USE `" . DB_NAME . "`");
 
-    // Auto-create tables
-    createTables($pdo);
+    // Auto-create tables only if not already initialized
+    $flagFile = __DIR__ . '/db_initialized.flag';
+    if (!file_exists($flagFile)) {
+        createTables($pdo);
+        @file_put_contents($flagFile, '1');
+    }
 
     return $pdo;
 }
@@ -70,6 +74,7 @@ function createTables(PDO $pdo): void {
             `is_active`       TINYINT(1)    NOT NULL DEFAULT 1,
             `email_verified`  TINYINT(1)    NOT NULL DEFAULT 0,
             `profile_picture` VARCHAR(500)  DEFAULT NULL,
+            `fcm_token`       VARCHAR(255)  DEFAULT NULL,
             `last_login_at`   DATETIME      DEFAULT NULL,
             `created_at`      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
             `updated_at`      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -88,6 +93,7 @@ function createTables(PDO $pdo): void {
             `email`           VARCHAR(255)  NOT NULL,
             `password`        VARCHAR(255)  NOT NULL COMMENT 'bcrypt hashed password',
             `is_active`       TINYINT(1)    NOT NULL DEFAULT 1,
+            `fcm_token`       VARCHAR(255)  DEFAULT NULL,
             `created_at`      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
             `updated_at`      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
@@ -286,6 +292,7 @@ function createTables(PDO $pdo): void {
             `latitude`        DECIMAL(10,8) NOT NULL DEFAULT 18.5204,
             `longitude`       DECIMAL(11,8) NOT NULL DEFAULT 73.8567,
             `max_capacity`    INT           NOT NULL DEFAULT 3,
+            `fcm_token`       VARCHAR(255)  DEFAULT NULL,
             `created_at`      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
             `updated_at`      DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             PRIMARY KEY (`id`),
@@ -337,4 +344,15 @@ function createTables(PDO $pdo): void {
             CONSTRAINT `fk_tiffin_hotel` FOREIGN KEY (`hotel_id`) REFERENCES `hotels` (`id`) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     ");
+
+    // Add fcm_token column to customers, vendors, drivers if they don't exist
+    try {
+        $pdo->exec("ALTER TABLE `customers` ADD COLUMN `fcm_token` VARCHAR(255) DEFAULT NULL");
+    } catch (PDOException $e) {}
+    try {
+        $pdo->exec("ALTER TABLE `vendors` ADD COLUMN `fcm_token` VARCHAR(255) DEFAULT NULL");
+    } catch (PDOException $e) {}
+    try {
+        $pdo->exec("ALTER TABLE `drivers` ADD COLUMN `fcm_token` VARCHAR(255) DEFAULT NULL");
+    } catch (PDOException $e) {}
 }

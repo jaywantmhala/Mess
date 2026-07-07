@@ -118,8 +118,23 @@ try {
             @fwrite($fp2, json_encode($notifStatus));
             @fclose($fp2);
         }
+
+        // Send FCM Notifications
+        require_once __DIR__ . '/../../../helpers/fcm.php';
+        // Notify Driver
+        FcmHelper::sendToDriver($driverId, "New Order Assigned", "Order #$orderId is assigned to you. Pick up from $hotelName.", [
+            'order_id' => $orderId,
+            'event' => 'ORDER_ASSIGNED'
+        ]);
+        // Notify Customer
+        $driverName = $driver['full_name'] ?? 'Driver';
+        FcmHelper::sendToCustomer($customerId, "Order Assigned", "Your order #$orderId has been assigned to driver $driverName.", [
+            'order_id' => $orderId,
+            'event' => 'ORDER_STATUS_UPDATED',
+            'status' => 'assigned'
+        ]);
     } catch (Exception $e) {
-        // Suppress WebSocket notification error to avoid blocking the REST response
+        // Suppress WebSocket/FCM notification error to avoid blocking the REST response
     }
 
     sendSuccess('Order assigned to driver successfully.', [

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/vendor.dart';
+import 'fcm_service.dart';
 
 // Update this to your local server's IP (e.g., 10.136.13.233, 10.0.2.2 for emulator, or localhost)
 const String _baseIp = '127.0.0.1';
@@ -138,6 +139,8 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kToken, token);
     await prefs.setString(_kVendor, jsonEncode(vendor.toJson()));
+    // Register FCM token for Vendor
+    FcmService.instance.registerToken('vendor');
   }
 
   Future<String?> getSavedToken() async {

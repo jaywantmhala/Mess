@@ -2,12 +2,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'services/auth_service.dart';
+import 'services/fcm_service.dart';
 import 'screens/welcome_screen.dart';
 import 'screens/home_shell.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await FcmService.instance.initialize();
 
   // System UI styling
   SystemChrome.setSystemUIOverlayStyle(

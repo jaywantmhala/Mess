@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/driver.dart';
+import 'fcm_service.dart';
 
 const String _baseIp = '127.0.0.1';
 const String _baseUrl = 'http://$_baseIp:8000/api/driver';
@@ -183,6 +184,8 @@ class DriverAuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kToken, token);
     await prefs.setString(_kDriver, jsonEncode(driver.toJson()));
+    // Register FCM token for Driver
+    FcmService.instance.registerToken('driver');
   }
 
   Future<String?> getSavedToken() async {

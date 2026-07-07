@@ -77,8 +77,31 @@ try {
             @fwrite($fp, json_encode($notification));
             @fclose($fp);
         }
+        // Send FCM Notifications
+        require_once __DIR__ . '/../../../helpers/fcm.php';
+
+        $statusBody = "Your order #$orderId status has changed to: $status";
+        if ($status === 'preparing') {
+            $statusBody = "Your order #$orderId is being prepared.";
+        } elseif ($status === 'ready') {
+            $statusBody = "Your order #$orderId is ready for pickup.";
+        } elseif ($status === 'completed') {
+            $statusBody = "Your order #$orderId has been delivered and completed.";
+        } elseif ($status === 'cancelled') {
+            $statusBody = "Your order #$orderId has been cancelled.";
+        } elseif ($status === 'rejected') {
+            $statusBody = "Your order #$orderId has been rejected by the kitchen.";
+        } elseif ($status === 'accepted') {
+            $statusBody = "Your order #$orderId has been accepted by the kitchen.";
+        }
+
+        FcmHelper::sendToCustomer($customerId, "Order Status Update", $statusBody, [
+            'order_id' => $orderId,
+            'event' => 'ORDER_STATUS_UPDATED',
+            'status' => $status
+        ]);
     } catch (Exception $e) {
-        // Suppress WebSocket notification error to avoid blocking the REST response
+        // Suppress WebSocket/FCM notification error to avoid blocking the REST response
     }
 
     sendSuccess('Order status updated successfully.', [

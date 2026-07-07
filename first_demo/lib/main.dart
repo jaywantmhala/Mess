@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'services/fcm_service.dart';
 import 'screens/welcome_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await FcmService.instance.initialize();
   runApp(const MyApp());
 }
 

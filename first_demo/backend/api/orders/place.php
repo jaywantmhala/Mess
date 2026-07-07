@@ -134,7 +134,10 @@ try {
     $clearStmt = $pdo->prepare("DELETE FROM cart_items WHERE customer_id = ?");
     $clearStmt->execute([$customerId]);
 
-    // ── 9.5. Send real-time notification to WebSocket server ───────────────
+    // ── 10. Commit ───────────────────────────────────────────────────────────
+    $pdo->commit();
+
+    // ── 11. Send real-time notifications (outside transaction) ───────────────
     try {
         // Fetch hotel vendor_id and hotel_name
         $hotelQuery = $pdo->prepare("SELECT vendor_id, hotel_name FROM hotels WHERE id = ?");
@@ -181,13 +184,16 @@ try {
             ];
             @fwrite($fp, json_encode($notification));
             @fclose($fp);
+            // Send FCM notification to Vendor (asynchronous background process)
+            require_once __DIR__ . '/../../helpers/fcm.php';
+            FcmHelper::sendToVendor($vendorId, "New Order Received", "Order #$orderId has been placed at $hotelName.", [
+                'order_id' => $orderId,
+                'event' => 'NEW_ORDER'
+            ]);
         }
     } catch (Exception $e) {
         // Suppress notification errors so order placement isn't blocked if WS server is down
     }
-
-    // ── 10. Commit ───────────────────────────────────────────────────────────
-    $pdo->commit();
 
     sendSuccess('Order placed successfully.', [
         'order_id'           => $orderId,

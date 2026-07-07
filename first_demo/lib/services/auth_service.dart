@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/customer.dart';
 import '../utils/app_config.dart';
+import 'fcm_service.dart';
 
 /// Base URL of your PHP backend.
 /// ┌─────────────────────────────────────────────────────────────────┐
@@ -159,6 +160,8 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kToken, token);
     await prefs.setString(_kCustomer, jsonEncode(customer.toJson()));
+    // Register FCM token
+    FcmService.instance.registerToken();
   }
 
   /// Read saved JWT token (null if not logged in).

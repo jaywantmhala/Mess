@@ -12,13 +12,13 @@ on:
       track:
         description: 'Google Play Release Track'
         required: true
-        default: 'internal'
+        default: 'production'
         type: choice
         options:
+          - production
           - internal
           - alpha
           - beta
-          - production
 
 jobs:
   build-and-deploy:
@@ -45,10 +45,18 @@ jobs:
       - name: Restore Keystore & Signing Configuration
         env:
           KEYSTORE_BASE64: ${{ secrets.CUSTOMER_KEYSTORE_BASE64 }}
-          KEY_PROPERTIES: ${{ secrets.CUSTOMER_KEY_PROPERTIES }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > first_demo/android/upload-keystore.jks
-          echo "$KEY_PROPERTIES" > first_demo/android/key.properties
+          echo "$KEYSTORE_BASE64" | tr -d '\r\n ' | base64 -d > first_demo/android/upload-keystore.jks
+          cp first_demo/android/upload-keystore.jks first_demo/android/app/upload-keystore.jks
+          cat << 'EOF' > first_demo/android/key.properties
+          storePassword=HungrilyFoods@2026Key
+          keyPassword=HungrilyFoods@2026Key
+          keyAlias=upload
+          storeFile=upload-keystore.jks
+          EOF
+          cp first_demo/android/key.properties first_demo/android/app/key.properties
+          echo "Verifying restored keystore:"
+          keytool -list -v -keystore first_demo/android/upload-keystore.jks -storepass HungrilyFoods@2026Key | grep -i "SHA1:"
 
       - name: Install Dependencies
         working-directory: first_demo
@@ -73,5 +81,5 @@ jobs:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_JSON_KEY }}
           packageName: com.zenqube.hungrilyfoods
           releaseFiles: first_demo/build/app/outputs/bundle/release/*.aab
-          track: ${{ github.event.inputs.track || 'internal' }}
+          track: ${{ github.event.inputs.track || 'production' }}
           status: completed

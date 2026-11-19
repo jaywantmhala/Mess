@@ -1,7 +1,32 @@
 import 'package:flutter/foundation.dart';
 
-/// Shared application configuration constants.
-/// Update [_baseIp] to match your server's IP/host.
-const String _baseIp = '127.0.0.1'; // Localhost over adb reverse forwarding
+/// Set to true to point all services to the local development server (10.44.177.233:8000).
+/// Set to false to point all services to the live production server (https://hungrilyfoods.com).
+const bool kUseLocalUrl = false;
 
-final String kBaseUrl = kIsWeb ? 'http://localhost:8000' : 'http://$_baseIp:8000';
+const String _kLocalUrlIp = 'http://10.44.177.233:8000';
+const String _kLocalUrlWeb = 'http://10.44.177.233:8000';
+const String _kLocalUrlAndroid = 'http://10.44.177.233:8000';
+const String _kLocalUrlIos = 'http://10.44.177.233:8000';
+const String _kProdUrl = 'https://hungrilyfoods.com';
+
+String get kBaseUrl {
+  if (kUseLocalUrl) {
+    return _kLocalUrlIp;
+  }
+  return _kProdUrl;
+}
+
+String get kEnvPrefix => kUseLocalUrl ? 'dev' : 'prod';
+
+const String kAblyDevApiKey = 'oSsZ2A.MVAVyA:EhxvHAEsSfx49DDHPqZ9_u3d7LzUETbyXpQl0sjW1Nk';
+const String kAblyProdApiKey = 'oSsZ2A.MVAVyA:EhxvHAEsSfx49DDHPqZ9_u3d7LzUETbyXpQl0sjW1Nk';
+
+String get kAblyApiKey => kUseLocalUrl ? kAblyDevApiKey : kAblyProdApiKey;
+
+String kVendorChannel(int vendorId) => '${kEnvPrefix}_vendor_$vendorId';
+String kDriverChannel(int driverId) => '${kEnvPrefix}_driver_$driverId';
+String kOrderChannel(int orderId) => '${kEnvPrefix}_order_$orderId';
+String kHotelOrdersChannel(int hotelId) => '${kEnvPrefix}_hotel_${hotelId}_orders';
+String kOrderChatChannel(int orderId) => '${kEnvPrefix}_order_${orderId}_chat';
+String get kAblyChannelName => '${kEnvPrefix}_global_events';

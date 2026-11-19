@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Redesigned Expanded custom notification matching the screenshot -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="#121315"
+    android:orientation="vertical"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="0dp">
+
+    <!-- ── ROW 0: Custom Header (App Info + Collapse Chevron) ── -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingTop="8dp"
+        android:paddingBottom="12dp">
+
+        <!-- App Logo (Circular) -->
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@drawable/hungrily_logo"
+            android:scaleType="fitCenter" />
+
+        <!-- App Title -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="Hungrily • Meals on Wheels"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <!-- Time -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="Just now"
+            android:textColor="#8E9093"
+            android:textSize="12sp" />
+
+        <!-- Spacer -->
+        <View
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
+        <!-- Status Red Dot -->
+        <View
+            android:layout_width="6dp"
+            android:layout_height="6dp"
+            android:layout_marginEnd="12dp"
+            android:background="@drawable/red_dot" />
+
+        <!-- Chevron Up (Collapse) -->
+        <ImageView
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:src="@drawable/ic_chevron_up"
+            android:scaleType="fitCenter" />
+
+    </LinearLayout>
+
+    <!-- ── ROW 1: Message Content and Thumbnail ── -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingBottom="12dp">
+
+        <!-- Left Column: Title + Body Text -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <!-- Title: Package icon + text -->
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <ImageView
+                    android:id="@+id/notif_status_icon"
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/notif_package_icon"
+                    android:scaleType="fitCenter" />
+
+                <TextView
+                    android:id="@+id/notif_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="Order Updated!"
+                    android:textColor="#FFFFFF"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.01"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+            </LinearLayout>
+
+            <!-- Body Text -->
+            <TextView
+                android:id="@+id/notif_body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Please share OTP 8500 with the driver to return your empty tiffin."
+                android:textColor="#CCCCCC"
+                android:textSize="13sp"
+                android:lineSpacingExtra="2dp"
+                android:maxLines="3"
+                android:ellipsize="end" />
+        </LinearLayout>
+
+        <!-- Right Column: Thumbnail Container with Bell Badge Overlay -->
+        <FrameLayout
+            android:layout_width="100dp"
+            android:layout_height="76dp"
+            android:layout_marginStart="14dp"
+            android:layout_gravity="center_vertical">
+
+            <!-- Tiffin Box Image with rounded corners -->
+            <ImageView
+                android:id="@+id/notif_thumb"
+                android:layout_width="92dp"
+                android:layout_height="64dp"
+                android:layout_gravity="bottom|left"
+                android:scaleType="centerCrop"
+                android:src="@drawable/notif_tiffin_box"
+                android:background="@drawable/notif_thumb_bg"
+                android:clipToOutline="true" />
+
+            <!-- Bell Badge circular white background -->
+            <FrameLayout
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="top|right"
+                android:background="@drawable/notif_bell_badge_bg"
+                android:padding="5dp">
+
+                <!-- Orange Bell Icon -->
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:src="@drawable/ic_bell"
+                    android:scaleType="fitCenter" />
+            </FrameLayout>
+        </FrameLayout>
+    </LinearLayout>
+
+    <!-- ── Divider ── -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#222428"
+        android:layout_marginBottom="0dp" />
+
+    <!-- ── ROW 2: Action Footer ── -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="44dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <!-- Left: warning icon + text -->
+        <ImageView
+            android:layout_width="14dp"
+            android:layout_height="14dp"
+            android:src="@drawable/ic_shield"
+            android:layout_marginEnd="6dp" />
+
+        <TextView
+            android:id="@+id/notif_security_hint"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Do not share OTP with anyone"
+            android:textColor="#E07820"
+            android:textSize="12sp"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <!-- Vertical divider -->
+        <View
+            android:layout_width="1dp"
+            android:layout_height="20dp"
+            android:background="#222428"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp" />
+
+        <!-- Right: VIEW DETAILS button -->
+        <LinearLayout
+            android:id="@+id/notif_btn_view_details"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:padding="8dp">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="VIEW DETAILS"
+                android:textColor="#E07820"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:letterSpacing="0.08" />
+
+            <ImageView
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:layout_marginStart="4dp"
+                android:src="@drawable/ic_chevron_right"
+                android:tint="#E07820"
+                android:scaleType="fitCenter" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+</LinearLayout>

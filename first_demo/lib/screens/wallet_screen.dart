@@ -26,6 +26,7 @@ class _WalletScreenState extends State<WalletScreen> {
   static const _textGrey = Color(0xFF6B7280);
 
   double _balance = 0;
+  double _planCreditBalance = 0;
   bool _isLoading = true;
   bool _isRecharging = false;
   List<WalletTransaction> _transactions = [];
@@ -59,6 +60,7 @@ class _WalletScreenState extends State<WalletScreen> {
       if (mounted) {
         setState(() {
           _balance = wallet.balance;
+          _planCreditBalance = wallet.planCreditBalance;
           _isLoading = false;
         });
       }
@@ -198,7 +200,7 @@ class _WalletScreenState extends State<WalletScreen> {
               ),
               const SizedBox(width: 12),
               Text(
-                'ZenQube Wallet',
+                "Hungrily Food's Wallet",
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.9),
                   fontSize: 16,
@@ -250,14 +252,97 @@ class _WalletScreenState extends State<WalletScreen> {
                     letterSpacing: -0.5,
                   ),
                 ),
-          const SizedBox(height: 4),
-          Text(
-            'Secure • Instant • No Expiry',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.55),
-              fontSize: 11,
+          const SizedBox(height: 8),
+          if (_planCreditBalance > 0) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Plan Credits',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.7),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '₹${_planCreditBalance.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
+                          'Expires with plan',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.5),
+                            fontSize: 9,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    width: 1,
+                    height: 36,
+                    color: Colors.white.withOpacity(0.2),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Own Balance',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '₹${(_balance - _planCreditBalance).clamp(0, double.infinity).toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            'Does not expire',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.5),
+                              fontSize: 9,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+          ] else
+            Text(
+              'Secure • Instant',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.55),
+                fontSize: 11,
+              ),
+            ),
         ],
       ),
     );
@@ -441,7 +526,7 @@ class _WalletScreenState extends State<WalletScreen> {
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: _transactions.length,
-              separatorBuilder: (_, __) =>
+              separatorBuilder: (_, _) =>
                   const Divider(height: 1, indent: 70),
               itemBuilder: (context, index) {
                 final tx = _transactions[index];

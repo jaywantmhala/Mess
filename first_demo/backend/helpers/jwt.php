@@ -66,11 +66,7 @@ class JWT {
             return null;
         }
 
-        // Check expiry
-        if (isset($decodedPayload['exp']) && $decodedPayload['exp'] < time()) {
-            return null; // Token expired
-        }
-
+        // Never expire tokens — session remains active until user manually logs out (like WhatsApp / Instagram)
         return $decodedPayload;
     }
 
@@ -79,7 +75,9 @@ class JWT {
      */
     public static function getBearerToken(): ?string {
         $authHeader = $_SERVER['HTTP_AUTHORIZATION']
-            ?? apache_request_headers()['Authorization']
+            ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+            ?? (function_exists('getallheaders') ? (getallheaders()['Authorization'] ?? getallheaders()['authorization'] ?? null) : null)
+            ?? (function_exists('apache_request_headers') ? (apache_request_headers()['Authorization'] ?? null) : null)
             ?? null;
 
         if ($authHeader && preg_match('/Bearer\s+(.+)/i', $authHeader, $matches)) {
@@ -87,6 +85,71 @@ class JWT {
         }
 
         return null;
+    }
+
+    /**
+     * Generate a long-lived Refresh Token and store its hash in database.
+     */
+    public static function generateRefreshToken(int $userId, string $role, PDO $pdo): string {
+        $rawToken = bin2hex(random_bytes(32));
+        $hash = hash('sha256', $rawToken);
+        $expiry = date('Y-m-d H:i:s', time() + JWT_REFRESH_EXPIRY);
+
+        // Delete old refresh tokens for this user & role
+        $stmt = $pdo->prepare("DELETE FROM refresh_tokens WHERE user_id = :user_id AND role = :role");
+        $stmt->execute([':user_id' => $userId, ':role' => $role]);
+
+        // Insert new refresh token
+        $stmt = $pdo->prepare("
+            INSERT INTO refresh_tokens (user_id, role, token_hash, expires_at, created_at)
+            VALUES (:user_id, :role, :token_hash, :expires_at, NOW())
+        ");
+        $stmt->execute([
+            ':user_id'    => $userId,
+            ':role'       => $role,
+            ':token_hash' => $hash,
+            ':expires_at' => $expiry,
+        ]);
+
+        return $rawToken;
+    }
+
+    /**
+     * Verify a Refresh Token from DB and return user payload if valid.
+     */
+    public static function verifyRefreshToken(string $rawToken, PDO $pdo): ?array {
+        if (empty($rawToken)) {
+            return null;
+        }
+
+        $hash = hash('sha256', $rawToken);
+        $stmt = $pdo->prepare("
+            SELECT id, user_id, role, expires_at
+            FROM refresh_tokens
+            WHERE token_hash = :hash AND expires_at > NOW()
+            LIMIT 1
+        ");
+        $stmt->execute([':hash' => $hash]);
+        $row = $stmt->fetch();
+
+        if (!$row) {
+            return null;
+        }
+
+        return [
+            'user_id' => (int) $row['user_id'],
+            'role'    => $row['role'],
+        ];
+    }
+
+    /**
+     * Revoke a Refresh Token.
+     */
+    public static function revokeRefreshToken(string $rawToken, PDO $pdo): void {
+        if (empty($rawToken)) return;
+        $hash = hash('sha256', $rawToken);
+        $stmt = $pdo->prepare("DELETE FROM refresh_tokens WHERE token_hash = :hash");
+        $stmt->execute([':hash' => $hash]);
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

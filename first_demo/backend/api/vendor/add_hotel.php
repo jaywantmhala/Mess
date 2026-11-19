@@ -57,6 +57,26 @@ $country  = isset($body['country'])   ? sanitize($body['country'])   : null;
 $pincode  = isset($body['pincode'])   ? sanitize($body['pincode'])   : null;
 $landmark = isset($body['landmark'])  ? sanitize($body['landmark'])  : null;
 $photoUrl = isset($body['photo_url'])  ? sanitize($body['photo_url'])  : null;
+$fssaiNumber        = isset($body['fssai_number'])        ? sanitize($body['fssai_number'])        : null;
+$fssaiPhotoUrl      = isset($body['fssai_photo_url'])      ? sanitize($body['fssai_photo_url'])      : null;
+$panNumber          = isset($body['pan_number'])          ? sanitize($body['pan_number'])          : null;
+$panPhotoUrl        = isset($body['pan_photo_url'])        ? sanitize($body['pan_photo_url'])        : null;
+$aadharNumber       = isset($body['aadhar_number'])       ? sanitize($body['aadhar_number'])       : null;
+$aadharPhotoUrl     = isset($body['aadhar_photo_url'])     ? sanitize($body['aadhar_photo_url'])     : null;
+$shopActNumber      = isset($body['shop_act_number'])      ? sanitize($body['shop_act_number'])      : null;
+$shopActPhotoUrl    = isset($body['shop_act_photo_url'])    ? sanitize($body['shop_act_photo_url'])    : null;
+$udyamAadharNumber  = isset($body['udyam_aadhar_number'])  ? sanitize($body['udyam_aadhar_number'])  : null;
+$udyamAadharPhotoUrl= isset($body['udyam_aadhar_photo_url'])? sanitize($body['udyam_aadhar_photo_url']): null;
+$gstNumber          = isset($body['gst_number'])          ? sanitize($body['gst_number'])          : null;
+$gstPhotoUrl        = isset($body['gst_photo_url'])        ? sanitize($body['gst_photo_url'])        : null;
+$serviceType        = isset($body['service_type'])        ? strtoupper(sanitize($body['service_type'])) : 'BOTH';
+if (!in_array($serviceType, ['DINING', 'DELIVERY', 'BOTH'])) {
+    $serviceType = 'BOTH';
+}
+$foodType           = isset($body['food_type'])           ? strtoupper(sanitize($body['food_type'])) : 'BOTH';
+if (!in_array($foodType, ['VEG', 'NON_VEG', 'BOTH'])) {
+    $foodType = 'BOTH';
+}
 
 if (empty($ownerName))     { sendError('Owner name is required.', 422); }
 if (empty($mobileNumber))  { sendError('Mobile number is required.', 422); }
@@ -76,50 +96,72 @@ if ($longitude === false || $longitude < -180.0 || $longitude > 180.0) {
 // ── Database ──────────────────────────────────────────────────────────────────
 $pdo = getDBConnection();
 
-// Verify vendor exists and is active
-$stmt = $pdo->prepare("SELECT id FROM vendors WHERE id = :id AND is_active = 1 LIMIT 1");
-$stmt->execute([':id' => $vendorId]);
-if (!$stmt->fetch()) {
-    sendError('Vendor account not found or deactivated.', 404);
+try {
+    // Verify vendor exists and is active
+    $stmt = $pdo->prepare("SELECT id FROM vendors WHERE id = :id AND is_active = 1 LIMIT 1");
+    $stmt->execute([':id' => $vendorId]);
+    if (!$stmt->fetch()) {
+        sendError('Vendor account not found or deactivated.', 404);
+    }
+
+    // Insert hotel
+    $stmt = $pdo->prepare("
+        INSERT INTO hotels (
+            vendor_id, hotel_name, owner_name, mobile_number, email, hotel_address, 
+            latitude, longitude, place_id, city, area, state, country, pincode, landmark, photo_url,
+            fssai_number, fssai_photo_url, pan_number, pan_photo_url, aadhar_number, aadhar_photo_url,
+            shop_act_number, shop_act_photo_url, udyam_aadhar_number, udyam_aadhar_photo_url, gst_number, gst_photo_url, service_type, food_type, created_at, updated_at
+        )
+        VALUES (
+            :vendor_id, :hotel_name, :owner_name, :mobile_number, :email, :hotel_address, 
+            :latitude, :longitude, :place_id, :city, :area, :state, :country, :pincode, :landmark, :photo_url,
+            :fssai_number, :fssai_photo_url, :pan_number, :pan_photo_url, :aadhar_number, :aadhar_photo_url,
+            :shop_act_number, :shop_act_photo_url, :udyam_aadhar_number, :udyam_aadhar_photo_url, :gst_number, :gst_photo_url, :service_type, :food_type, NOW(), NOW()
+        )
+    ");
+    $stmt->execute([
+        ':vendor_id'              => $vendorId,
+        ':hotel_name'             => $hotelName,
+        ':owner_name'             => $ownerName,
+        ':mobile_number'          => $mobileNumber,
+        ':email'                  => $email,
+        ':hotel_address'          => $hotelAddress,
+        ':latitude'               => $latitude,
+        ':longitude'              => $longitude,
+        ':place_id'               => $placeId,
+        ':city'                   => $city,
+        ':area'                   => $area,
+        ':state'                  => $state,
+        ':country'                => $country,
+        ':pincode'                => $pincode,
+        ':landmark'               => $landmark,
+        ':photo_url'              => $photoUrl,
+        ':fssai_number'           => $fssaiNumber,
+        ':fssai_photo_url'        => $fssaiPhotoUrl,
+        ':pan_number'             => $panNumber,
+        ':pan_photo_url'           => $panPhotoUrl,
+        ':aadhar_number'          => $aadharNumber,
+        ':aadhar_photo_url'       => $aadharPhotoUrl,
+        ':shop_act_number'        => $shopActNumber,
+        ':shop_act_photo_url'     => $shopActPhotoUrl,
+        ':udyam_aadhar_number'   => $udyamAadharNumber,
+        ':udyam_aadhar_photo_url' => $udyamAadharPhotoUrl,
+        ':gst_number'             => $gstNumber,
+        ':gst_photo_url'          => $gstPhotoUrl,
+        ':service_type'           => $serviceType,
+        ':food_type'              => $foodType,
+    ]);
+
+    $hotelId = (int)$pdo->lastInsertId();
+
+    // Fetch the added hotel
+    $stmt = $pdo->prepare("SELECT * FROM hotels WHERE id = :id");
+    $stmt->execute([':id' => $hotelId]);
+    $hotel = $stmt->fetch();
+
+    sendSuccess('Hotel added successfully.', [
+        'hotel' => $hotel,
+    ], 201);
+} catch (PDOException $e) {
+    sendError('Database error while saving hotel: ' . $e->getMessage(), 500);
 }
-
-// Insert hotel
-$stmt = $pdo->prepare("
-    INSERT INTO hotels (
-        vendor_id, hotel_name, owner_name, mobile_number, email, hotel_address, 
-        latitude, longitude, place_id, city, area, state, country, pincode, landmark, photo_url, created_at, updated_at
-    )
-    VALUES (
-        :vendor_id, :hotel_name, :owner_name, :mobile_number, :email, :hotel_address, 
-        :latitude, :longitude, :place_id, :city, :area, :state, :country, :pincode, :landmark, :photo_url, NOW(), NOW()
-    )
-");
-$stmt->execute([
-    ':vendor_id'     => $vendorId,
-    ':hotel_name'    => $hotelName,
-    ':owner_name'    => $ownerName,
-    ':mobile_number' => $mobileNumber,
-    ':email'         => $email,
-    ':hotel_address' => $hotelAddress,
-    ':latitude'      => $latitude,
-    ':longitude'     => $longitude,
-    ':place_id'      => $placeId,
-    ':city'          => $city,
-    ':area'          => $area,
-    ':state'         => $state,
-    ':country'       => $country,
-    ':pincode'       => $pincode,
-    ':landmark'      => $landmark,
-    ':photo_url'     => $photoUrl,
-]);
-
-$hotelId = (int)$pdo->lastInsertId();
-
-// Fetch the added hotel
-$stmt = $pdo->prepare("SELECT * FROM hotels WHERE id = :id");
-$stmt->execute([':id' => $hotelId]);
-$hotel = $stmt->fetch();
-
-sendSuccess('Hotel added successfully.', [
-    'hotel' => $hotel,
-], 201);

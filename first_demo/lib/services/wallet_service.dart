@@ -16,6 +16,9 @@ class WalletService {
   // ValueNotifier to notify listeners of wallet updates.
   final ValueNotifier<double?> balanceNotifier = ValueNotifier<double?>(null);
 
+  // ValueNotifier to signal the ledger screen to refresh after a new transaction.
+  final ValueNotifier<int> transactionNotifier = ValueNotifier<int>(0);
+
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   Future<Map<String, String>> _authHeaders() async {
@@ -77,6 +80,7 @@ class WalletService {
           walletId: 0,
           customerId: 0,
           balance: newBal,
+          planCreditBalance: 0,
         );
       }
       throw Exception(body['message'] ?? 'Recharge failed');
@@ -105,7 +109,9 @@ class WalletService {
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
       if (body['success'] == true && body['data'] != null) {
-        final list = body['data'] as List;
+        // API returns data as { transactions: [...], page, limit, total }
+        final data = body['data'] as Map<String, dynamic>;
+        final list = (data['transactions'] as List? ?? []);
         return list
             .map((t) =>
                 WalletTransaction.fromJson(t as Map<String, dynamic>))

@@ -40,11 +40,17 @@ $stmt = $pdo->prepare("
         h.longitude as hotel_lng,
         c.latitude as customer_lat, 
         c.longitude as customer_lng, 
-        cust.full_name as customer_name
+        cust.full_name as customer_name,
+        cust.phone_number as customer_phone
     FROM orders o
     JOIN hotels h ON o.hotel_id = h.id
     JOIN customers cust ON o.customer_id = cust.id
-    LEFT JOIN customer_addresses c ON o.customer_id = c.customer_id
+    LEFT JOIN customer_addresses c ON c.id = (
+        SELECT id FROM customer_addresses 
+        WHERE customer_id = o.customer_id 
+        ORDER BY is_default DESC, id DESC 
+        LIMIT 1
+    )
     WHERE o.driver_id = :driver_id
     ORDER BY o.order_id DESC
 ");
@@ -57,8 +63,9 @@ foreach ($orders as &$order) {
     $order['grand_total'] = (float)$order['grand_total'];
     $order['hotel_lat'] = (float)$order['hotel_lat'];
     $order['hotel_lng'] = (float)$order['hotel_lng'];
-    $order['customer_lat'] = $order['customer_lat'] ? (float)$order['customer_lat'] : 18.5204;
-    $order['customer_lng'] = $order['customer_lng'] ? (float)$order['customer_lng'] : 73.8567;
+    $order['customer_lat'] = !empty($order['customer_lat']) ? (float)$order['customer_lat'] : 0.0;
+    $order['customer_lng'] = !empty($order['customer_lng']) ? (float)$order['customer_lng'] : 0.0;
+    $order['customer_phone'] = $order['customer_phone'] ?? '';
 }
 
 sendSuccess('Assigned orders retrieved.', ['orders' => $orders]);

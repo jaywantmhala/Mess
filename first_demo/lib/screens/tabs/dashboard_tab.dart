@@ -1,25 +1,24 @@
-import 'dart:math' as math;
+// lib/screens/tabs/dashboard_tab.dart
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../models/hotel.dart';
 import '../../services/hotel_service.dart';
-import '../hotel_details_screen.dart';
 import '../hotel_menu_screen.dart';
-import 'package:url_launcher/url_launcher_string.dart';
 import '../../models/address_data.dart';
 import '../../services/address_service.dart';
 import '../select_address_screen.dart';
 import '../../services/wallet_service.dart';
-import '../wallet_screen.dart';
 import '../../services/order_service.dart';
 import '../../models/order.dart';
-import '../../services/websocket_service.dart';
+import '../../services/ably_service.dart';
 import 'dart:async';
 import '../order_status_screen.dart';
+import '../customer_subscription_screen.dart';
+import '../hotels_near_you_screen.dart';
+import '../saved_addresses_screen.dart';
+import '../customer_notifications_screen.dart';
+import '../../services/notification_service.dart';
 
-// =============================================================================
-// HotelModel
-// =============================================================================
 class HotelModel {
   final String id;
   final String name;
@@ -27,14 +26,13 @@ class HotelModel {
   final int reviews;
   final double distanceKm;
   final bool isOpen;
-  final String tag; // e.g. "Pure Veg" — empty string if none
-  final String deliveryTime; // e.g. "20-25 mins"
-  final String costForTwo; // e.g. "₹₹₹"
+  final String tag;
+  final String deliveryTime;
+  final String costForTwo;
   final String address;
   final String phone;
   final IconData icon;
   final List<Color> gradient;
-  // Fractional position of the pin on the map, x/y in [-1, 1]
   final Alignment mapAlignment;
   final Hotel rawHotel;
 
@@ -59,27 +57,6 @@ class HotelModel {
   String get distanceLabel => '${distanceKm.toStringAsFixed(1)} km away';
 }
 
-// =============================================================================
-// Color palette — coral / warm-pink + white, matching the reference design.
-// =============================================================================
-class _HotelColors {
-  static const coral = Color(0xFFFF6F5E);
-  static const coralSoft = Color(0xFFFFEDE9);
-  static const pageBg = Color(0xFFFFF3F1);
-  static const mapBg = Color(0xFFF3E9E7);
-  static const textDark = Color(0xFF2B2B2B);
-  static const textGrey = Color(0xFF9A9A9A);
-  static const success = Color(0xFF2ECC71);
-  static const danger = Color(0xFFFF5252);
-  static const amber = Color(0xFFFFB300);
-  static const cardBorder = Color(0xFFF0F0F0);
-}
-
-// =============================================================================
-// HotelLocatorDashboard — full page, NO sidebar (sidebar intentionally
-// omitted per request). Contains: top bar, map panel with radius + pins,
-// nearby-hotels list panel, and a bottom stats bar.
-// =============================================================================
 class HotelLocatorDashboard extends StatefulWidget {
   const HotelLocatorDashboard({super.key});
 
@@ -87,11 +64,13 @@ class HotelLocatorDashboard extends StatefulWidget {
   State<HotelLocatorDashboard> createState() => _HotelLocatorDashboardState();
 }
 
-class _HotelLocatorDashboardState extends State<HotelLocatorDashboard> with SingleTickerProviderStateMixin {
-  String? _selectedHotelId;
-
+class _HotelLocatorDashboardState extends State<HotelLocatorDashboard>
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   Position? _userPosition;
   List<Hotel> _backendHotels = [];
+  bool _hasActiveSubscription = false;
+  bool _isLocationServiceable = true;
+  bool _isSubscribedPlanServiceableAtLocation = true;
   bool _isLoading = true;
   String _errorMessage = '';
 
@@ -102,101 +81,63 @@ class _HotelLocatorDashboardState extends State<HotelLocatorDashboard> with Sing
 
   late ScrollController _scrollController;
   late AnimationController _radarController;
-  bool _isMapHidden = false;
 
-  Future<void> refreshWallet() async {
-    try {
-      final balanceData = await WalletService.instance.getBalance();
-      if (mounted) {
-        setState(() {
-          _walletBalance = balanceData.balance;
-        });
-      }
-    } catch (e) {
-      debugPrint('Failed to fetch wallet balance: $e');
-    }
-  }
-
-  Future<void> _fetchActiveOrder() async {
-    try {
-      final history = await OrderService.instance.getHistory();
-      if (history.isNotEmpty) {
-        final latest = history.first;
-        // Status flow: created_order, accepted, preparing, ready, completed, cancelled
-        final activeStatuses = ['created_order', 'accepted', 'preparing', 'ready'];
-        if (activeStatuses.contains(latest.status)) {
-          if (mounted) {
-            setState(() {
-              _activeOrder = latest;
-            });
-          }
-          return;
-        }
-      }
-      if (mounted) {
-        setState(() {
-          _activeOrder = null;
-        });
-      }
-    } catch (e) {
-      debugPrint('Failed to fetch active order: $e');
-    }
-  }
+  // Design Tokens matching reference photo 100%
+  static const Color _brandOrange = Color(0xFFF58220);
+  static const Color _gradientEnd = Color(0xFFE65100);
+  static const Color _bgWarm = Color(0xFFF6F8FA);
+  static const Color _white = Colors.white;
+  static const Color _ink = Color(0xFF1A1A2E);
+  static const Color _greySub = Color(0xFF6B7280);
+  static const Color _cardBorder = Color(0xFFF3F4F6);
+  static const Color _darkGreen = Color(0xFF0F3A22);
 
   @override
   void initState() {
     super.initState();
     _scrollController = ScrollController();
-    _scrollController.addListener(_onScroll);
     _radarController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 3),
+      duration: const Duration(seconds: 4),
     )..repeat();
-    _loadAddressAndHotels();
-    refreshWallet();
-    _fetchActiveOrder();
-    WalletService.instance.balanceNotifier.addListener(_onWalletBalanceChanged);
-    _startWebSocketListener();
-  }
 
-  void _startWebSocketListener() {
-    // Make sure customer WS is connected
-    WebSocketService.instance.connect();
-    
-    _wsSubscription = WebSocketService.instance.messages.listen((msg) {
-      final event = msg['event'] as String?;
-      if (event == 'ORDER_STATUS_UPDATED') {
+    _loadAddressAndHotels();
+    NotificationService.instance.refreshUnreadCount();
+    _fetchActiveOrder();
+    _fetchWalletBalance();
+
+    WalletService.instance.balanceNotifier.addListener(_onWalletBalanceChanged);
+    _walletBalance = WalletService.instance.balanceNotifier.value;
+
+    AblyService.instance.connect();
+    _wsSubscription = AblyService.instance.messages.listen((msg) {
+      if (msg['type'] == 'order_status_update') {
         _fetchActiveOrder();
-        refreshWallet(); // Refresh balance just in case it was deducted
       }
     });
   }
 
   void _onWalletBalanceChanged() {
-    if (mounted) {
-      setState(() {
-        _walletBalance = WalletService.instance.balanceNotifier.value;
-      });
-    }
+    if (mounted)
+      setState(
+        () => _walletBalance = WalletService.instance.balanceNotifier.value,
+      );
   }
 
-  void _onScroll() {
-    if (_scrollController.hasClients) {
-      if (_scrollController.offset > 50 && !_isMapHidden) {
-        setState(() {
-          _isMapHidden = true;
-        });
-      } else if (_scrollController.offset <= 10 && _isMapHidden) {
-        setState(() {
-          _isMapHidden = false;
-        });
+  Future<void> _fetchWalletBalance() async {
+    try {
+      final wallet = await WalletService.instance.getBalance();
+      if (mounted) {
+        setState(() => _walletBalance = wallet.balance);
       }
-    }
+    } catch (_) {}
   }
 
   @override
   void dispose() {
-    WalletService.instance.balanceNotifier.removeListener(_onWalletBalanceChanged);
+    WalletService.instance.balanceNotifier.removeListener(
+      _onWalletBalanceChanged,
+    );
     _wsSubscription?.cancel();
     _radarController.dispose();
     _scrollController.dispose();
@@ -206,29 +147,48 @@ class _HotelLocatorDashboardState extends State<HotelLocatorDashboard> with Sing
   Future<void> _loadAddressAndHotels() async {
     try {
       final addr = await AddressService.instance.getAddress();
-      if (mounted) {
-        setState(() {
-          _savedAddress = addr;
-        });
-      }
+      if (mounted) setState(() => _savedAddress = addr);
     } catch (_) {}
     await _fetchNearbyHotels();
   }
 
-  /// Request permissions and fetch nearby hotels from backend based on current GPS location or selected custom address
+  Future<void> _fetchActiveOrder() async {
+    try {
+      final orders = await OrderService.instance.getHistory(limit: 5);
+      final active = orders.firstWhere(
+        (o) =>
+            o.status != 'completed' &&
+            o.status != 'rejected' &&
+            o.status != 'cancelled',
+        orElse: () => OrderHistoryItem(
+          orderId: 0,
+          hotelName: '',
+          status: '',
+          grandTotal: 0.0,
+          walletDeducted: 0.0,
+          itemCount: 0,
+          createdAt: DateTime.now(),
+        ),
+      );
+      if (mounted && active.orderId != 0) {
+        setState(() => _activeOrder = active);
+      } else if (mounted) {
+        setState(() => _activeOrder = null);
+      }
+    } catch (_) {}
+  }
+
   Future<void> _fetchNearbyHotels() async {
     setState(() {
       _isLoading = true;
       _errorMessage = '';
     });
     try {
-      double lat;
-      double lng;
-
+      // Use saved address coordinates first, GPS second, 0,0 last (backend fallback)
+      double lat = 0.0, lng = 0.0;
       if (_savedAddress != null && _savedAddress!.latitude != 0.0) {
         lat = _savedAddress!.latitude;
         lng = _savedAddress!.longitude;
-        // Mock a Position so map calculations using _userPosition work correctly
         _userPosition = Position(
           latitude: lat,
           longitude: lng,
@@ -243,854 +203,1381 @@ class _HotelLocatorDashboardState extends State<HotelLocatorDashboard> with Sing
         );
       } else {
         bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-        if (!serviceEnabled) {
-          throw 'Location services are disabled.';
-        }
-
-        LocationPermission permission = await Geolocator.checkPermission();
-        if (permission == LocationPermission.denied) {
-          permission = await Geolocator.requestPermission();
+        if (serviceEnabled) {
+          LocationPermission permission = await Geolocator.checkPermission();
           if (permission == LocationPermission.denied) {
-            throw 'Location permissions are denied.';
+            permission = await Geolocator.requestPermission();
+          }
+          if (permission == LocationPermission.whileInUse ||
+              permission == LocationPermission.always) {
+            final position = await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.high,
+            );
+            _userPosition = position;
+            lat = position.latitude;
+            lng = position.longitude;
           }
         }
-
-        if (permission == LocationPermission.deniedForever) {
-          throw 'Location permissions are permanently denied.';
-        }
-
-        final position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-        );
-        _userPosition = position;
-        lat = position.latitude;
-        lng = position.longitude;
       }
 
-      final hotelsList = await HotelService.instance.getNearbyHotels(
+      debugPrint(
+        '📍 [Dashboard] Fetching plans with lat=$lat, lng=$lng, addr=${_savedAddress?.fullAddress}',
+      );
+
+      final res = await HotelService.instance.getNearbyHotels(
+        latitude: lat,
+        longitude: lng,
+      );
+      final planRes = await HotelService.instance.getServiceablePlans(
+        latitude: lat,
+        longitude: lng,
+        pincode: _savedAddress?.pincode,
+        address: _savedAddress?.fullAddress,
+      );
+      final currentSub = await HotelService.instance.getCurrentSubscription(
         latitude: lat,
         longitude: lng,
       );
 
+      // Single source of truth: currentSub from /api/customer/subscription/current
+      // res.hasActiveSubscription is used ONLY for hotels display, not for plan banner
+      final sub = currentSub?['subscription'] as Map<String, dynamic>?;
+      final subStatus = sub?['status'] as String? ?? '';
+      final subEnd = sub?['end_date'] as String? ?? '';
+      final subRemaining = (sub?['remaining_deliveries'] ?? 0) as int;
+
+      bool hasSub =
+          subStatus == 'ACTIVE' &&
+          subRemaining > 0 &&
+          subEnd.isNotEmpty &&
+          DateTime.tryParse(
+                subEnd,
+              )?.isAfter(DateTime.now().subtract(const Duration(days: 1))) ==
+              true;
+
+      bool locationServiceable =
+          planRes.serviceable || planRes.plans.isNotEmpty;
+      bool planServiceableAtLocation = true;
+
+      if (hasSub) {
+        if (currentSub != null &&
+            currentSub['is_serviceable_at_address'] == false) {
+          planServiceableAtLocation = false;
+        }
+      }
+
+      debugPrint(
+        '📍 [Dashboard] Result: hasSub=$hasSub, locationServiceable=$locationServiceable, planServiceable=$planServiceableAtLocation',
+      );
+
       if (mounted) {
         setState(() {
-          _backendHotels = hotelsList;
+          _backendHotels = res.hotels
+              .where((h) => (h.distance ?? 0) <= 3.0)
+              .toList();
+          _hasActiveSubscription = hasSub;
+          _isLocationServiceable = locationServiceable;
+          _isSubscribedPlanServiceableAtLocation = planServiceableAtLocation;
+          _errorMessage = res.message ?? '';
           _isLoading = false;
         });
+        _fetchWalletBalance();
       }
     } catch (e) {
-      print('Fetch nearby hotels error: $e');
-      if (mounted) {
+      if (mounted)
         setState(() {
           _errorMessage = e.toString();
           _isLoading = false;
         });
-      }
     }
   }
 
   List<HotelModel> get _hotels {
-    if (_userPosition == null) return [];
-    double userLat = _userPosition!.latitude;
-    double userLng = _userPosition!.longitude;
+    final userLat = _userPosition?.latitude ?? 18.5204;
+    final userLng = _userPosition?.longitude ?? 73.8567;
+
+    if (_backendHotels.isEmpty) {
+      return [];
+    }
 
     return _backendHotels.map((h) {
-      double latDiff = h.latitude - userLat;
-      double lngDiff = h.longitude - userLng;
-
-      // rough km conversion for Pune/India (1 degree lat ~ 111km, 1 degree lng ~ 105km)
-      double dyKm = latDiff * 111.0;
-      double dxKm = lngDiff * 105.0;
-
-      // 2 km corresponds to 0.72 magnitude on the mock map circle
-      double alignX = (dxKm / 2.0) * 0.72;
-      double alignY = -(dyKm / 2.0) * 0.72; // negative because North is up (-Y in alignment)
-
-      Alignment mapAlignment = Alignment(
-        alignX.clamp(-0.95, 0.95),
-        alignY.clamp(-0.95, 0.95),
-      );
-
+      final dyKm = (h.latitude - userLat) * 111.0;
+      final dxKm = (h.longitude - userLng) * 105.0;
+      final alignX = (dxKm / 3.0 * 0.72).clamp(-0.85, 0.85);
+      final alignY = (-(dyKm / 3.0) * 0.72).clamp(-0.85, 0.85);
       return HotelModel(
         id: h.id.toString(),
         name: h.hotelName,
-        rating: 4.0 + (h.id % 9) * 0.1,
-        reviews: 20 + h.id * 8,
+        rating: 4.5,
+        reviews: 120,
         distanceKm: h.distance ?? 0.0,
         isOpen: true,
-        tag: h.landmark != null && h.landmark!.isNotEmpty ? h.landmark! : 'Nearby',
+        tag: 'Nearby',
         deliveryTime: '20-25 mins',
         costForTwo: '₹₹',
         address: h.hotelAddress,
         phone: h.mobileNumber,
         icon: Icons.storefront_rounded,
-        gradient: const [Color(0xFFFFB199), Color(0xFFFF6F5E)],
-        mapAlignment: mapAlignment,
+        gradient: const [_brandOrange, _gradientEnd],
+        mapAlignment: Alignment(alignX, alignY),
         rawHotel: h,
       );
     }).toList();
   }
 
-  Widget _buildActiveOrderBar() {
-    if (_activeOrder == null) return const SizedBox.shrink();
-
-    Color statusColor = Colors.orange;
-    IconData statusIcon = Icons.query_builder_rounded;
-    String statusText = 'Received';
-
-    switch (_activeOrder!.status) {
-      case 'created_order':
-        statusColor = Colors.orange;
-        statusIcon = Icons.query_builder_rounded;
-        statusText = 'Received';
-        break;
-      case 'accepted':
-        statusColor = Colors.blue;
-        statusIcon = Icons.thumb_up_alt_rounded;
-        statusText = 'Accepted';
-        break;
-      case 'preparing':
-        statusColor = Colors.teal;
-        statusIcon = Icons.flatware_rounded;
-        statusText = 'Preparing';
-        break;
-      case 'ready':
-        statusColor = Colors.indigo;
-        statusIcon = Icons.inventory_2_rounded;
-        statusText = 'Ready for pickup';
-        break;
-    }
-
-    return Positioned(
-      bottom: 16,
-      left: 16,
-      right: 16,
-      child: GestureDetector(
-        onTap: _showActiveOrderDialog,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: const Color(0xFF1F1F2E),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.2),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  statusIcon,
-                  color: statusColor,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      _activeOrder!.hotelName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Order #${_activeOrder!.orderId} • $statusText',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: statusColor.withOpacity(0.4), width: 1),
-                ),
-                child: Text(
-                  statusText.toUpperCase(),
-                  style: TextStyle(
-                    color: statusColor,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showActiveOrderDialog() {
-    if (_activeOrder == null) return;
-    
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => OrderStatusScreen(initialOrder: _activeOrder!),
-      ),
-    );
-  }
-
-  String _getStatusTextLabel(String status) {
-    switch (status) {
-      case 'created_order':
-        return 'Order Received';
-      case 'accepted':
-        return 'Order Accepted';
-      case 'preparing':
-        return 'Preparing your Meal';
-      case 'ready':
-        return 'Ready for Pickup / Delivery';
-      case 'completed':
-        return 'Delivered';
-      case 'rejected':
-        return 'Rejected';
-      case 'cancelled':
-        return 'Cancelled';
-      default:
-        return status;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: _HotelColors.pageBg,
-      child: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isWide = constraints.maxWidth >= 900;
-            final screenWidth = constraints.maxWidth;
-
-            return Stack(
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
-                      child: _buildAddressHeader(),
-                    ),
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      curve: Curves.easeInOut,
-                      height: _isMapHidden ? 0 : 200, // 180 map + 20 spacing
-                    ),
-                    Expanded(
-                      child: _buildHotelListPanel(),
-                    ),
-                  ],
-                ),
-                AnimatedPositioned(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                  top: _isMapHidden ? -150 : 82, // Slides up off-screen
-                  left: 20,
-                  right: 20,
-                  height: 180,
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 300),
-                    opacity: _isMapHidden ? 0.0 : 1.0,
-                    child: _buildMapPanel(),
-                  ),
-                ),
-                // Floating Active Order Status Bar
-                _buildActiveOrderBar(),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-
-  // ---------------------------------------------------------------------
-  // Premium Address Header Row
-  // ---------------------------------------------------------------------
-  Widget _buildWalletBalanceChip() {
-    return InkWell(
-      onTap: () async {
-        await Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const WalletScreen(),
-          ),
-        );
-        refreshWallet(); // Refresh when returning
-      },
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFECEB), // Light coral/pink tint
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFFFC5BD), width: 1),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(
-              Icons.account_balance_wallet_rounded,
-              color: _HotelColors.coral,
-              size: 16,
-            ),
-            const SizedBox(width: 6),
-            Text(
-              _walletBalance != null
-                  ? '₹${_walletBalance!.toStringAsFixed(2)}'
-                  : '₹--',
-              style: const TextStyle(
-                color: _HotelColors.textDark,
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAddressHeader() {
-    final hasAddress = _savedAddress != null && _savedAddress!.fullAddress.isNotEmpty;
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        // Left side: Address picker (tappable)
-        Expanded(
-          child: InkWell(
-            onTap: _openAddressPicker,
-            borderRadius: BorderRadius.circular(8),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: const BoxDecoration(
-                      color: _HotelColors.coralSoft,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.location_on_rounded,
-                      color: _HotelColors.coral,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          hasAddress ? 'Delivering to' : 'Set location',
-                          style: const TextStyle(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w600,
-                            color: _HotelColors.textGrey,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Flexible(
-                              child: Text(
-                                hasAddress
-                                    ? _savedAddress!.shortLabel
-                                    : 'Add Address',
-                                style: const TextStyle(
-                                  fontSize: 14.5,
-                                  fontWeight: FontWeight.w800,
-                                  color: _HotelColors.textDark,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 2),
-                            const Icon(
-                              Icons.keyboard_arrow_down_rounded,
-                              size: 16,
-                              color: _HotelColors.coral,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        // Right side: Wallet balance chip
-        _buildWalletBalanceChip(),
-      ],
-    );
-  }
-
   Future<void> _openAddressPicker() async {
     final result = await Navigator.push<AddressData>(
       context,
-      MaterialPageRoute(
-        builder: (context) => const SelectAddressScreen(),
-      ),
+      MaterialPageRoute(builder: (_) => const SavedAddressesScreen()),
     );
-
     if (result != null) {
-      await AddressService.instance.saveAddress(result);
       if (mounted) {
-        setState(() {
-          _savedAddress = result;
-        });
+        setState(() => _savedAddress = result);
+        await _fetchNearbyHotels();
+      }
+    } else {
+      final latest = await AddressService.instance.getAddress();
+      if (mounted) {
+        setState(() => _savedAddress = latest);
         await _fetchNearbyHotels();
       }
     }
   }
 
-
-
-  // ---------------------------------------------------------------------
-  // Map panel: radius circle + hotel pins + zoom/locate controls + filters
-  // ---------------------------------------------------------------------
-  Widget _buildMapPanel() {
-    return Container(
-      decoration: BoxDecoration(
-        color: _HotelColors.mapBg,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
+  @override
+  Widget _buildNotificationBell() {
+    return GestureDetector(
+      onTap: () async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const CustomerNotificationsScreen(),
           ),
-        ],
+        );
+        NotificationService.instance.refreshUnreadCount();
+      },
+      child: ValueListenableBuilder<int>(
+        valueListenable: NotificationService.instance.unreadCountNotifier,
+        builder: (context, unreadCount, _) {
+          return Stack(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: _white,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: _cardBorder, width: 1.2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: const Icon(
+                  Icons.notifications_outlined,
+                  color: _ink,
+                  size: 21,
+                ),
+              ),
+              if (unreadCount > 0)
+                Positioned(
+                  top: 6,
+                  right: 6,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFEF4444),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          );
+        },
       ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        children: [
-          Positioned.fill(child: CustomPaint(painter: _StreetGridPainter())),
+    );
+  }
 
-          // Faint area labels
-          const Positioned(
-            top: 24,
-            left: 24,
-            child: _AreaLabel('Shivajinagar'),
-          ),
-          const Positioned(
-            top: 16,
-            right: 28,
-            child: _AreaLabel('Kalyani Nagar'),
-          ),
-          const Positioned(
-            top: 100,
-            right: 40,
-            child: _AreaLabel('Viman Nagar'),
-          ),
-          const Positioned(bottom: 90, left: 20, child: _AreaLabel('Kothrud')),
-          const Positioned(
-            bottom: 60,
-            right: 30,
-            child: _AreaLabel('Hadapsar'),
-          ),
-          const Positioned(bottom: 24, left: 90, child: _AreaLabel('Warje')),
-          const Positioned(bottom: 24, right: 90, child: _AreaLabel('NIBM')),
+  bool get wantKeepAlive => true;
 
-          // Radius circle + center dot + pins
-          Positioned.fill(
-            child: LayoutBuilder(
-              builder: (context, box) {
-                final size = box.biggest;
-                final radius = math.min(size.width, size.height) * 0.36;
-                final center = Offset(size.width / 2, size.height / 2);
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final mq = MediaQuery.of(context);
+    final isWide = mq.size.width > 600;
+    final addressText = _savedAddress?.fullAddress.isNotEmpty == true
+        ? _savedAddress!.fullAddress
+        : 'Karvenagar, Pune, Maharashtra';
 
-                return Stack(
-                  children: [
-                    AnimatedBuilder(
-                      animation: _radarController,
-                      builder: (context, child) {
-                        return CustomPaint(
-                          size: size,
-                          painter: _RadarPainter(
-                            center: center,
-                            radius: radius,
-                            animationValue: _radarController.value,
+    return Scaffold(
+      backgroundColor: _bgWarm,
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: isWide ? 540 : double.infinity,
+            ),
+            child: SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // ── 1. Top Header: Location, Wallet & Notification Bell ───────
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Left: Circular Logo Avatar & Address Column
+                      Expanded(
+                        child: InkWell(
+                          onTap: _openAddressPicker,
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: _white,
+                                  border: Border.all(
+                                    color: const Color(0xFF10B981),
+                                    width: 2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.08),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 3),
+                                    ),
+                                  ],
+                                ),
+                                child: const Center(
+                                  child: Text(
+                                    'H',
+                                    style: TextStyle(
+                                      fontSize: 22,
+                                      fontWeight: FontWeight.w900,
+                                      color: _brandOrange,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: const [
+                                        Flexible(
+                                          child: Text(
+                                            'Hungrily Foods',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 17,
+                                              fontWeight: FontWeight.w900,
+                                              color: _ink,
+                                            ),
+                                          ),
+                                        ),
+                                        SizedBox(width: 4),
+                                        Icon(
+                                          Icons.keyboard_arrow_down_rounded,
+                                          color: _ink,
+                                          size: 18,
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.location_on_rounded,
+                                          color: _brandOrange,
+                                          size: 13,
+                                        ),
+                                        const SizedBox(width: 3),
+                                        Expanded(
+                                          child: Text(
+                                            addressText,
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              color: _greySub,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // Right: Wallet Balance Pill & Bell Icon
+                      Row(
+                        children: [
+                          // Wallet Pill
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF7ED),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: const Color(0xFFFFEDD5),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(
+                                  Icons.account_balance_wallet_rounded,
+                                  color: _brandOrange,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  _walletBalance != null
+                                      ? '₹${_walletBalance!.toStringAsFixed(1)}'
+                                      : '...',
+                                  style: const TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w900,
+                                    color: _ink,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+
+                          // Notification Bell
+                          Stack(
+                            children: [
+                              GestureDetector(
+                                onTap: () async {
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const CustomerNotificationsScreen(),
+                                    ),
+                                  );
+                                  NotificationService.instance
+                                      .refreshUnreadCount();
+                                },
+                                child: Container(
+                                  /*
+                            children: [
+                              Container(
+                        */
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: _white,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: _cardBorder,
+                                      width: 1.2,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.04),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Icon(
+                                    Icons.notifications_outlined,
+                                    color: _ink,
+                                    size: 21,
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                top: 6,
+                                right: 6,
+                                child: Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFFEF4444),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+
+                  // ── 2. Promotional Hero Banner ("Hunger Delivered!") ──────────
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(20),
+                    child: AspectRatio(
+                      aspectRatio: 1024 / 512,
+                      child: Image.asset(
+                        'assets/images/hungrily_banner.png',
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorBuilder: (ctx, err, stack) => Container(
+                          height: 175,
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [_brandOrange, _gradientEnd],
+                            ),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Center(
+                            child: Text(
+                              'HUNGER DELIVERED!',
+                              style: TextStyle(
+                                color: _white,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 18,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // ── 3. Interactive Radar Map Card ─────────────────────────────
+                  Container(
+                    height: 175,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEDE8E3),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: _cardBorder, width: 1.2),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Stack(
+                      children: [
+                        // Custom Light Street Map Painter
+                        Positioned.fill(
+                          child: CustomPaint(painter: _LightMapPainter()),
+                        ),
+
+                        // Animated Radar Circle Sweep
+                        Positioned.fill(
+                          child: Center(
+                            child: Container(
+                              width: 110,
+                              height: 110,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(
+                                  0xFF10B981,
+                                ).withOpacity(0.12),
+                                border: Border.all(
+                                  color: const Color(
+                                    0xFF10B981,
+                                  ).withOpacity(0.4),
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Center(
+                                child: Container(
+                                  width: 14,
+                                  height: 14,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: const Color(0xFF10B981),
+                                    border: Border.all(
+                                      color: _white,
+                                      width: 2.5,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        // Live Hotel Pins on Map
+                        for (final hotel in _hotels)
+                          Align(
+                            alignment: hotel.mapAlignment,
+                            child: GestureDetector(
+                              onTap: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      HotelMenuScreen(hotel: hotel.rawHotel),
+                                ),
+                              ),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: _white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: _brandOrange,
+                                    width: 1.2,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.12),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(3),
+                                      decoration: const BoxDecoration(
+                                        color: _brandOrange,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.restaurant_rounded,
+                                        color: _white,
+                                        size: 10,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      hotel.name,
+                                      style: const TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w900,
+                                        color: _ink,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+
+                        // Top Center Floating Pill Tag: Showing hotels within 2 km
+                        Positioned(
+                          top: 10,
+                          left: 0,
+                          right: 0,
+                          child: Center(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _white,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.08),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.my_location_rounded,
+                                    size: 14,
+                                    color: Color(0xFF10B981),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Showing ${_hotels.length} hotels within 3 km',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                      color: _ink,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        // Right Side Map Control Buttons (Target & Refresh)
+                        Positioned(
+                          right: 10,
+                          top: 10,
+                          child: Column(
+                            children: [
+                              _buildMapControlBtn(
+                                Icons.my_location_rounded,
+                                onTap: _fetchNearbyHotels,
+                              ),
+                              const SizedBox(height: 8),
+                              _buildMapControlBtn(
+                                Icons.refresh_rounded,
+                                onTap: _fetchNearbyHotels,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // ── 4. Subscription Promo Banner (Dynamic State Render) ────────
+                  _buildSubscriptionPanel(),
+                  // ── 5. Live Order Status Tracker Card (ONLY shown if user has active order) ──
+                  if (_activeOrder != null) ...[
+                    const SizedBox(height: 14),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                OrderStatusScreen(initialOrder: _activeOrder!),
                           ),
                         );
                       },
-                    ),
-                    Positioned(
-                      left: center.dx - 9,
-                      top: center.dy - 9,
-                      child: const _CenterDot(),
-                    ),
-                    for (final hotel in _hotels)
-                      Align(
-                        alignment: hotel.mapAlignment,
-                        child: _MapPin(
-                          hotel: hotel,
-                          selected: _selectedHotelId == hotel.id,
-                          onTap: () => setState(() => _selectedHotelId = hotel.id),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF072C1C),
+                          borderRadius: BorderRadius.circular(22),
+                          border: Border.all(
+                            color: const Color(0xFF10B981).withOpacity(0.3),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF10B981).withOpacity(0.08),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            // Left Circular Food Bag Graphic with Outer Mint Ring
+                            Container(
+                              width: 54,
+                              height: 54,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: const Color(0xFFFFFBF5),
+                                border: Border.all(
+                                  color: const Color(0xFFD1FAE5),
+                                  width: 2.2,
+                                ),
+                              ),
+                              child: const Center(
+                                child: Icon(
+                                  Icons.shopping_bag_rounded,
+                                  color: _brandOrange,
+                                  size: 26,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+
+                            // Center Info Column (Hotel Name, Order Tag Capsule, Time)
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Hotel Name
+                                  Text(
+                                    _activeOrder!.hotelName.isNotEmpty
+                                        ? _activeOrder!.hotelName
+                                        : 'Restaurant',
+                                    style: const TextStyle(
+                                      fontSize: 19,
+                                      fontWeight: FontWeight.w900,
+                                      color: _white,
+                                      letterSpacing: -0.3,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 5),
+
+                                  // Order Tag Capsule (Order #85 | RECEIVED)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 9,
+                                      vertical: 3.5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF0F472F),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(
+                                        color: const Color(
+                                          0xFF10B981,
+                                        ).withOpacity(0.4),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: FittedBox(
+                                      fit: BoxFit.scaleDown,
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Icons.confirmation_number_outlined,
+                                            color: Color(0xFF10B981),
+                                            size: 14,
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            'Order #${_activeOrder!.orderId}',
+                                            style: const TextStyle(
+                                              fontSize: 11.5,
+                                              fontWeight: FontWeight.w800,
+                                              color: _white,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 5),
+
+                                  // Time Row (Clock Icon + Timestamp)
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.access_time_rounded,
+                                        color: Color(0xFFA0A5BA),
+                                        size: 14,
+                                      ),
+                                      const SizedBox(width: 5),
+                                      Text(
+                                        'Today, ${_activeOrder!.createdAt.hour.toString().padLeft(2, '0')}:${_activeOrder!.createdAt.minute.toString().padLeft(2, '0')}',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: Color(0xFFA0A5BA),
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+
+                            // Vertical Divider Line
+                            Container(
+                              height: 48,
+                              width: 1,
+                              margin: const EdgeInsets.symmetric(horizontal: 8),
+                              color: Colors.white.withOpacity(0.12),
+                            ),
+
+                            // Right Column: Received Capsule Badge & View Details Link
+                            Flexible(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  // Solid Green Gradient Pill Badge (✓ RECEIVED)
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        gradient: const LinearGradient(
+                                          colors: [
+                                            Color(0xFF00B074),
+                                            Color(0xFF10B981),
+                                          ],
+                                          begin: Alignment.centerLeft,
+                                          end: Alignment.centerRight,
+                                        ),
+                                        borderRadius: BorderRadius.circular(20),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: const Color(
+                                              0xFF10B981,
+                                            ).withOpacity(0.3),
+                                            blurRadius: 6,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(2),
+                                            decoration: const BoxDecoration(
+                                              color: _white,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.check_rounded,
+                                              color: Color(0xFF00B074),
+                                              size: 10,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 5),
+                                          Text(
+                                            _activeOrder!.status
+                                                        .toLowerCase() ==
+                                                    'created_order'
+                                                ? 'PLACED'
+                                                : _activeOrder!.status
+                                                      .toUpperCase(),
+                                            style: const TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w900,
+                                              color: _white,
+                                              letterSpacing: 0.6,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+
+                                  // View Details Link + Right Chevron Circle Button
+                                  FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Text(
+                                          'View Details',
+                                          style: TextStyle(
+                                            fontSize: 12.5,
+                                            fontWeight: FontWeight.w800,
+                                            color: _white,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Container(
+                                          width: 24,
+                                          height: 24,
+                                          decoration: const BoxDecoration(
+                                            color: Color(0xFF0E4A32),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.chevron_right_rounded,
+                                            color: _white,
+                                            size: 16,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
+                    ),
                   ],
-                );
-              },
-            ),
-          ),
+                  const SizedBox(height: 20),
 
-          // "Showing hotels within 2 km" chip
-          Positioned(
-            top: 16,
-            left: 16,
-            child: _floatingChip(
-              icon: Icons.info_outline_rounded,
-              text: 'Showing hotels within 2 km',
-              filled: true,
-            ),
-          ),
+                  // ── 6. "Explore More" 4-Card Feature Grid Matrix ────────────────
+                  const Text(
+                    'Explore More',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: _ink,
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
 
-          // Controls
-          Positioned(
-            bottom: 12,
-            right: 12,
-            child: Column(
-              children: [
-                _mapControlButton(Icons.refresh_rounded, onTap: _fetchNearbyHotels),
-                const SizedBox(height: 8),
-                _mapControlButton(Icons.my_location_rounded, onTap: _fetchNearbyHotels),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+                  Row(
+                    children: [
+                      // 1. Browse Hotels
+                      Expanded(
+                        child: _buildExploreCard(
+                          iconWidget: const Text(
+                            '🥗',
+                            style: TextStyle(fontSize: 22),
+                          ),
+                          iconBg: const Color(0xFFFFF0E6),
+                          title: 'Browse Mess',
+                          subtitle: 'Explore nearby\nmess',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const HotelsNearYouScreen(),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
 
-  Widget _floatingChip({
-    IconData? icon,
-    bool dot = false,
-    required String text,
-    bool filled = false,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: filled ? _HotelColors.coralSoft : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null)
-            Icon(icon, size: 14, color: _HotelColors.coral)
-          else if (dot)
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _HotelColors.coralSoft,
-                border: Border.all(color: _HotelColors.coral, width: 1.4),
+                      // 2. Daily Menus
+                      Expanded(
+                        child: _buildExploreCard(
+                          iconWidget: const Text(
+                            '📅',
+                            style: TextStyle(fontSize: 22),
+                          ),
+                          iconBg: const Color(0xFFFFF0E6),
+                          title: 'Daily Menus',
+                          subtitle: "See today's menu\n& offers",
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const HotelsNearYouScreen(),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+
+                      // 3. Top Rated
+                      Expanded(
+                        child: _buildExploreCard(
+                          iconWidget: const Icon(
+                            Icons.star_rounded,
+                            color: Color(0xFFF59E0B),
+                            size: 24,
+                          ),
+                          iconBg: const Color(0xFFFEF3C7),
+                          title: 'Top Rated',
+                          subtitle: 'Try top rated\nmess',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const HotelsNearYouScreen(),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+
+                      // 4. Offers
+                      Expanded(
+                        child: _buildExploreCard(
+                          iconWidget: const Text(
+                            '🎟️',
+                            style: TextStyle(fontSize: 22),
+                          ),
+                          iconBg: const Color(0xFFFEE2E2),
+                          title: 'Offers',
+                          subtitle: 'Exciting deals\nfor you',
+                          onTap: () {},
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
               ),
             ),
-          const SizedBox(width: 6),
-          Text(
-            text,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: _HotelColors.coral,
-            ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _mapControlButton(IconData icon, {required VoidCallback onTap}) {
-    return Material(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: onTap,
-        child: Container(
-          width: 38,
-          height: 38,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.08),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Icon(icon, size: 18, color: _HotelColors.textDark),
         ),
       ),
     );
   }
 
-  // ---------------------------------------------------------------------
-  // Right-hand "Nearby Hotels" list panel
-  // ---------------------------------------------------------------------
-  Widget _buildHotelListPanel() {
-    final hotels = List<HotelModel>.from(_hotels)..sort((a, b) => a.distanceKm.compareTo(b.distanceKm));
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
-          ),
-        ],
+  Widget _buildMapControlBtn(IconData icon, {required VoidCallback onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: _white,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Icon(icon, size: 18, color: _ink),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Nearby Hotels (${hotels.length})',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: _HotelColors.textDark,
-                ),
+    );
+  }
+
+  Widget _buildSubscriptionPanel() {
+    // Case 1: Active Subscription & Valid Location -> Plan Activated! (See Nearby Hotels)
+    if (_hasActiveSubscription && _isSubscribedPlanServiceableAtLocation) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFECFDF5),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFA7F3D0), width: 1.2),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: const BoxDecoration(
+                color: Color(0xFF10B981),
+                shape: BoxShape.circle,
               ),
-              Container(
+              child: const Icon(Icons.check_rounded, color: _white, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'Plan Activated!',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF0F5B33),
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'You can now see and order from top mess.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: _greySub,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const HotelsNearYouScreen()),
+              ),
+              child: Container(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
+                  horizontal: 14,
+                  vertical: 9,
                 ),
                 decoration: BoxDecoration(
-                  border: Border.all(color: _HotelColors.cardBorder),
-                  borderRadius: BorderRadius.circular(10),
+                  color: _brandOrange,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _brandOrange.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
                 ),
                 child: Row(
                   children: const [
                     Text(
-                      'Sort by: Nearest',
+                      'View Mess',
                       style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: _HotelColors.textDark,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        color: _white,
                       ),
                     ),
                     SizedBox(width: 4),
-                    Icon(Icons.keyboard_arrow_down_rounded, size: 14),
+                    Icon(Icons.chevron_right_rounded, color: _white, size: 16),
                   ],
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Expanded(
-            child: _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(color: _HotelColors.coral),
-                  )
-                : hotels.isEmpty
-                    ? Center(
-                        child: Text(
-                          _errorMessage.isNotEmpty ? _errorMessage : 'No hotels found',
-                          style: const TextStyle(color: _HotelColors.textGrey),
-                          textAlign: TextAlign.center,
-                        ),
-                      )
-                    : ListView.separated(
-                        controller: _scrollController,
-                        physics: const BouncingScrollPhysics(),
-                        itemCount: hotels.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                          final hotel = hotels[index];
-                          return _ZomatoHotelCard(
-                            hotel: hotel,
-                            onTap: () async {
-                              final orderPlaced = await Navigator.push<bool>(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => HotelMenuScreen(
-                                    hotel: hotel.rawHotel,
-                                  ),
-                                ),
-                              );
-                              if (orderPlaced == true) {
-                                refreshWallet();
-                                await _fetchActiveOrder();
-                                if (_activeOrder != null && mounted) {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => OrderStatusScreen(initialOrder: _activeOrder!),
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                          );
-                        },
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Case 2: Active Subscription BUT Plan is NOT Serviceable at Current Location
+    if (_hasActiveSubscription && !_isSubscribedPlanServiceableAtLocation) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFFBEB),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFFDE68A), width: 1.2),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.warning_amber_rounded,
+                color: Color(0xFFD97706),
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'Plan Not Available Here',
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF92400E),
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Your active plan is not available at this current location.',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: _greySub,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SelectAddressScreen()),
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 9,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD97706),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFD97706).withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: const [
+                    Text(
+                      'Change Location',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        color: _white,
                       ),
-          ),
-          const SizedBox(height: 12),
-        ],
-      ),
-    );
-  }
+                    ),
+                    SizedBox(width: 3),
+                    Icon(Icons.chevron_right_rounded, color: _white, size: 16),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
-  // ---------------------------------------------------------------------
+    // Case 3: NOT Subscribed AND NO Plans Available at Current Location
+    if (!_hasActiveSubscription && !_isLocationServiceable) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF3F4F6),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE5E7EB), width: 1.2),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFE5E7EB),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                Icons.location_off_rounded,
+                color: Color(0xFF4B5563),
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'No plan available here',
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF1F2937),
+                    ),
+                  ),
+                  SizedBox(height: 2),
+                  Text(
+                    'Meal plans are not serviceable in this area yet.',
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      color: _greySub,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SelectAddressScreen()),
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 9,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4B5563),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  children: const [
+                    Text(
+                      'Check Area',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w900,
+                        color: _white,
+                      ),
+                    ),
+                    SizedBox(width: 3),
+                    Icon(Icons.chevron_right_rounded, color: _white, size: 16),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
-}
-
-// =============================================================================
-// Small stateless helper widgets
-// =============================================================================
-class _AreaLabel extends StatelessWidget {
-  final String text;
-  const _AreaLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: TextStyle(
-        fontSize: 11,
-        color: _HotelColors.textGrey.withOpacity(0.7),
-        fontWeight: FontWeight.w500,
-      ),
-    );
-  }
-}
-
-class _CenterDot extends StatelessWidget {
-  const _CenterDot({super.key});
-
-  @override
-  Widget build(BuildContext context) {
+    // Case 4: NOT Subscribed AND Plans ARE Available at Current Location -> Subscribe to Unlock Hotels
     return Container(
-      width: 18,
-      height: 18,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: const Color(0xFF3B82F6),
-        border: Border.all(color: Colors.white, width: 3),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF3B82F6).withOpacity(0.4),
-            blurRadius: 8,
-            spreadRadius: 2,
-          ),
-        ],
+        color: const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFFFEDD5), width: 1.2),
       ),
-    );
-  }
-}
-
-class _MapPin extends StatelessWidget {
-  final HotelModel hotel;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _MapPin({
-    super.key,
-    required this.hotel,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: Row(
         children: [
           Container(
-            width: 34,
-            height: 34,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: _HotelColors.coral,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.15),
-                  blurRadius: 6,
-                  offset: const Offset(0, 3),
+              color: const Color(0xFFFFF0E6),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(
+              Icons.lock_rounded,
+              color: _brandOrange,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                Text(
+                  'Subscribe to Unlock Mess',
+                  style: TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w900,
+                    color: _ink,
+                  ),
+                ),
+                SizedBox(height: 2),
+                Text(
+                  'Choose a meal plan for your area',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _greySub,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
-            alignment: Alignment.center,
-            child: const Icon(
-              Icons.storefront_rounded,
-              color: Colors.white,
-              size: 16,
-            ),
           ),
-          const SizedBox(height: 3),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(6),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 4),
-              ],
-            ),
-            child: Text(
-              '${hotel.distanceKm.toStringAsFixed(1)} km',
-              style: TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.bold,
-                color: hotel.distanceKm > 2.0 ? _HotelColors.danger : _HotelColors.success,
+          GestureDetector(
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const CustomerSubscriptionScreen(),
+                ),
+              );
+              if (mounted) {
+                await WalletService.instance.getBalance();
+                await _fetchWalletBalance();
+                await _fetchNearbyHotels();
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                color: _brandOrange,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: _brandOrange.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: const [
+                  Text(
+                    'View Plan',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: _white,
+                    ),
+                  ),
+                  SizedBox(width: 4),
+                  Icon(Icons.chevron_right_rounded, color: _white, size: 16),
+                ],
               ),
             ),
           ),
@@ -1098,334 +1585,119 @@ class _MapPin extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildExploreCard({
+    required Widget iconWidget,
+    required Color iconBg,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 135,
+        decoration: BoxDecoration(
+          color: _white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: _cardBorder, width: 1.2),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.035),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+              child: Center(child: iconWidget),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w800,
+                color: _ink,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 9.5,
+                color: _greySub,
+                fontWeight: FontWeight.w500,
+                height: 1.15,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _StreetGridPainter extends CustomPainter {
+// ─────────────────────────────────────────────────────────────────────────────
+// Light Map Painter for Radar Map Card
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _LightMapPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white.withOpacity(0.5)
-      ..strokeWidth = 1.2;
+    final bgPaint = Paint()..color = const Color(0xFFECEAE6);
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bgPaint);
 
-    const step = 46.0;
-    for (double x = 0; x < size.width; x += step) {
-      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
-    }
-    for (double y = 0; y < size.height; y += step) {
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
-    }
+    final roadPaint = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 14
+      ..style = PaintingStyle.stroke;
+
+    final roadPaintThin = Paint()
+      ..color = Colors.white
+      ..strokeWidth = 8
+      ..style = PaintingStyle.stroke;
+
+    final greenAreaPaint = Paint()
+      ..color = const Color(0xFFD1E7DD).withOpacity(0.7);
+
+    // Green park shapes
+    final park1 = Path()
+      ..moveTo(size.width * 0.05, size.height * 0.3)
+      ..lineTo(size.width * 0.25, size.height * 0.1)
+      ..lineTo(size.width * 0.3, size.height * 0.45)
+      ..close();
+    canvas.drawPath(park1, greenAreaPaint);
+
+    // Diagonal roads
+    canvas.drawLine(
+      Offset(0, size.height * 0.2),
+      Offset(size.width, size.height * 0.6),
+      roadPaint,
+    );
+    canvas.drawLine(
+      Offset(size.width * 0.1, size.height),
+      Offset(size.width * 0.8, 0),
+      roadPaint,
+    );
+    canvas.drawLine(
+      Offset(size.width * 0.3, 0),
+      Offset(size.width * 0.9, size.height),
+      roadPaintThin,
+    );
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-
-class _RadarPainter extends CustomPainter {
-  final Offset center;
-  final double radius;
-  final double animationValue;
-
-  _RadarPainter({
-    required this.center,
-    required this.radius,
-    required this.animationValue,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final fillPaint = Paint()..color = _HotelColors.coral.withOpacity(0.06);
-    canvas.drawCircle(center, radius, fillPaint);
-
-    final dashPaint = Paint()
-      ..color = _HotelColors.coral.withOpacity(0.6)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6;
-
-    const dashWidth = 6.0;
-    const dashSpace = 5.0;
-    final circumference = 2 * math.pi * radius;
-    final dashCount = (circumference / (dashWidth + dashSpace)).floor();
-    final angleStep = (2 * math.pi) / dashCount;
-
-    for (int i = 0; i < dashCount; i++) {
-      final startAngle = i * angleStep;
-      final endAngle = startAngle + (dashWidth / radius);
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius),
-        startAngle,
-        endAngle - startAngle,
-        false,
-        dashPaint,
-      );
-    }
-
-    // Radar Sweep
-    final sweepPaint = Paint()
-      ..shader = SweepGradient(
-        colors: [
-          _HotelColors.coral.withOpacity(0.0),
-          _HotelColors.coral.withOpacity(0.1),
-          _HotelColors.coral.withOpacity(0.5),
-          _HotelColors.coral.withOpacity(0.0),
-        ],
-        stops: const [0.0, 0.7, 0.99, 1.0],
-        transform: GradientRotation(animationValue * 2 * math.pi),
-      ).createShader(Rect.fromCircle(center: center, radius: radius));
-
-    canvas.drawCircle(center, radius, sweepPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _RadarPainter oldDelegate) =>
-      oldDelegate.center != center ||
-      oldDelegate.radius != radius ||
-      oldDelegate.animationValue != animationValue;
-}
-
-class _ZomatoHotelCard extends StatelessWidget {
-  final HotelModel hotel;
-  final VoidCallback onTap;
-
-  const _ZomatoHotelCard({required this.hotel, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Image area
-            Stack(
-              children: [
-                Container(
-                  height: 120,
-                  decoration: BoxDecoration(
-                    color: _HotelColors.cardBorder,
-                    image: hotel.rawHotel.photoUrl != null && hotel.rawHotel.photoUrl!.isNotEmpty
-                        ? DecorationImage(
-                            image: NetworkImage(hotel.rawHotel.photoUrl!),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
-                  ),
-                  alignment: Alignment.center,
-                  child: (hotel.rawHotel.photoUrl == null || hotel.rawHotel.photoUrl!.isEmpty)
-                      ? Icon(hotel.icon, color: _HotelColors.textGrey, size: 50)
-                      : null,
-                ),
-                // Top Left Tag
-                if (hotel.tag.isNotEmpty || hotel.isOpen)
-                  Positioned(
-                    top: 12,
-                    left: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.6),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            hotel.isOpen ? Icons.stars_rounded : Icons.cancel_rounded,
-                            size: 12,
-                            color: Colors.white,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            hotel.isOpen ? (hotel.tag.isNotEmpty ? hotel.tag : 'Open Now') : 'Closed',
-                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.white),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                // Top Right Bookmark
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.3),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      Icons.bookmark_border_rounded,
-                      size: 20,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                // Ad tag
-                Positioned(
-                  top: 16,
-                  right: 48,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      'Ad',
-                      style: TextStyle(fontSize: 10, color: Colors.white),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            // Content below image
-            Padding(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          hotel.name,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: _HotelColors.textDark,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF24963F), // Zomato green
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Row(
-                              children: [
-                                Text(
-                                  hotel.rating.toString(),
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(width: 2),
-                                const Icon(Icons.star_rounded, size: 12, color: Colors.white),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          const Text(
-                            'For you',
-                            style: TextStyle(fontSize: 10, color: _HotelColors.textGrey),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      const Icon(Icons.access_time_rounded, size: 14, color: _HotelColors.textGrey),
-                      const SizedBox(width: 4),
-                      Text(
-                        hotel.deliveryTime,
-                        style: const TextStyle(fontSize: 11, color: _HotelColors.textGrey),
-                      ),
-                      const SizedBox(width: 6),
-                      const Text('•', style: TextStyle(color: _HotelColors.textGrey)),
-                      const SizedBox(width: 6),
-                      Text(
-                        hotel.distanceLabel,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: hotel.distanceKm > 2.0 ? _HotelColors.danger : _HotelColors.textGrey,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      const Text('•', style: TextStyle(color: _HotelColors.textGrey)),
-                      const SizedBox(width: 6),
-                      const Icon(Icons.delivery_dining_rounded, size: 13, color: _HotelColors.textGrey),
-                      const SizedBox(width: 3),
-                      const Text(
-                        'Free',
-                        style: TextStyle(fontSize: 11, color: _HotelColors.textGrey),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  // Offer row
-                  Row(
-                    children: [
-                      const Icon(Icons.local_offer_rounded, size: 13, color: Colors.blue),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Flat ₹40 OFF above ₹99',
-                        style: TextStyle(fontSize: 11, color: Colors.blue[700], fontWeight: FontWeight.w600),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  // Dashed divider replacement (solid light line for simplicity)
-                  const Divider(color: Color(0xFFEEEEEE), height: 1, thickness: 1),
-                  const SizedBox(height: 8),
-                  // Bottom tags
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.eco_rounded,
-                              size: 14,
-                              color: Colors.green,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              hotel.tag.isNotEmpty ? hotel.tag : 'Pure Veg restaurant',
-                              style: const TextStyle(fontSize: 11, color: _HotelColors.textGrey),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-

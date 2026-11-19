@@ -7,6 +7,8 @@ import '../widgets/app_text_field.dart';
 import 'home_shell.dart';
 import 'signup_screen.dart';
 import 'driver_login_screen.dart';
+import 'forgot_password_screen.dart';
+import 'phone_auth_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -245,7 +247,31 @@ class _LoginScreenState extends State<LoginScreen>
                                       return null;
                                     },
                                   ),
-                                  const SizedBox(height: 36),
+                                  const SizedBox(height: 10),
+
+                                  // ── Forgot Password Link ─────────────
+                                  Align(
+                                    alignment: Alignment.centerRight,
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => const ForgotPasswordScreen(),
+                                          ),
+                                        );
+                                      },
+                                      child: const Text(
+                                        'Forgot Password?',
+                                        style: TextStyle(
+                                          color: AppColors.primary,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
 
                                   // ── Login Button ─────────────────────
                                   AppPrimaryButton(
@@ -254,6 +280,61 @@ class _LoginScreenState extends State<LoginScreen>
                                     isLoading: _isLoading,
                                     onPressed:
                                         _isLoading ? null : _handleLogin,
+                                  ),
+                                  const SizedBox(height: 18),
+
+                                  // ── "or" Divider ──────────────────────────────
+                                  Row(
+                                    children: [
+                                      const Expanded(child: Divider(color: Color(0xFFE5E7EB))),
+                                      Container(
+                                        width: 32,
+                                        height: 32,
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          shape: BoxShape.circle,
+                                          border: Border.all(color: const Color(0xFFE5E7EB), width: 1.2),
+                                        ),
+                                        child: const Center(
+                                          child: Text(
+                                            'or',
+                                            style: TextStyle(fontSize: 11.5, color: Color(0xFF6B7280), fontWeight: FontWeight.w600),
+                                          ),
+                                        ),
+                                      ),
+                                      const Expanded(child: Divider(color: Color(0xFFE5E7EB))),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 18),
+
+                                  // ── Sign In with Phone OTP Button ─────────────
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 52,
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(builder: (_) => const PhoneAuthScreen(role: 'vendor')),
+                                        );
+                                      },
+                                      icon: const Icon(Icons.phone_iphone_rounded, color: Colors.white, size: 21),
+                                      label: const Text(
+                                        'Sign In with Phone OTP',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 15.5,
+                                          letterSpacing: 0.2,
+                                        ),
+                                      ),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: const Color(0xFF25D366),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                                        elevation: 3,
+                                        shadowColor: const Color(0xFF25D366).withOpacity(0.35),
+                                      ),
+                                    ),
                                   ),
                                   const SizedBox(height: 24),
 

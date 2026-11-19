@@ -4,9 +4,10 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../models/hotel.dart';
 import 'auth_service.dart';
+import '../utils/app_config.dart';
+import '../utils/api_client.dart';
 
-const String _baseIp = '127.0.0.1';
-const String _baseUrl = 'http://$_baseIp:8000/api/vendor';
+final String _baseUrl = kBaseUrl;
 const Duration _timeout = Duration(seconds: 15);
 
 class HotelResult {
@@ -24,17 +25,8 @@ class HotelService {
   /// Retrieve all hotels owned by the logged-in vendor
   Future<List<Hotel>> getHotels() async {
     try {
-      final token = await AuthService.instance.getSavedToken();
-      if (token == null) return [];
-
-      final response = await http
-          .get(
-            Uri.parse('$_baseUrl/hotels'),
-            headers: {
-              'Content-Type': 'application/json; charset=utf-8',
-              'Authorization': 'Bearer $token',
-            },
-          )
+      final response = await ApiClient.instance
+          .get(Uri.parse('$_baseUrl/hotels'))
           .timeout(_timeout);
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
@@ -69,6 +61,20 @@ class HotelService {
     String? pincode,
     String? landmark,
     String? photoUrl,
+    String? fssaiNumber,
+    String? fssaiPhotoUrl,
+    String? panNumber,
+    String? panPhotoUrl,
+    String? aadharNumber,
+    String? aadharPhotoUrl,
+    String? shopActNumber,
+    String? shopActPhotoUrl,
+    String? udyamAadharNumber,
+    String? udyamAadharPhotoUrl,
+    String? gstNumber,
+    String? gstPhotoUrl,
+    String? serviceType,
+    String? foodType,
   }) async {
     try {
       final token = await AuthService.instance.getSavedToken();
@@ -102,11 +108,41 @@ class HotelService {
               if (pincode != null) 'pincode': pincode,
               if (landmark != null) 'landmark': landmark,
               if (photoUrl != null) 'photo_url': photoUrl,
+              if (fssaiNumber != null) 'fssai_number': fssaiNumber.trim(),
+              if (fssaiPhotoUrl != null) 'fssai_photo_url': fssaiPhotoUrl,
+              if (panNumber != null) 'pan_number': panNumber.trim(),
+              if (panPhotoUrl != null) 'pan_photo_url': panPhotoUrl,
+              if (aadharNumber != null) 'aadhar_number': aadharNumber.trim(),
+              if (aadharPhotoUrl != null) 'aadhar_photo_url': aadharPhotoUrl,
+              if (shopActNumber != null) 'shop_act_number': shopActNumber.trim(),
+              if (shopActPhotoUrl != null) 'shop_act_photo_url': shopActPhotoUrl,
+              if (udyamAadharNumber != null) 'udyam_aadhar_number': udyamAadharNumber.trim(),
+              if (udyamAadharPhotoUrl != null) 'udyam_aadhar_photo_url': udyamAadharPhotoUrl,
+              if (gstNumber != null) 'gst_number': gstNumber.trim(),
+              if (gstPhotoUrl != null) 'gst_photo_url': gstPhotoUrl,
+              'service_type': serviceType ?? 'BOTH',
+              'food_type': foodType ?? 'BOTH',
             }),
           )
           .timeout(_timeout);
 
-      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (response.body.trim().isEmpty) {
+        return const HotelResult(
+          success: false,
+          message: 'Server returned an empty response. Please check database schema or server logs.',
+        );
+      }
+
+      final Map<String, dynamic> body;
+      try {
+        body = jsonDecode(response.body) as Map<String, dynamic>;
+      } catch (_) {
+        return HotelResult(
+          success: false,
+          message: 'Server error (${response.statusCode}): ${response.body}',
+        );
+      }
+
       final bool ok = body['success'] == true;
 
       if (ok) {
@@ -114,7 +150,7 @@ class HotelService {
         final hotel = Hotel.fromJson(data['hotel'] as Map<String, dynamic>);
         return HotelResult(
           success: true,
-          message: body['message'] as String,
+          message: body['message'] as String? ?? 'Hotel registered successfully',
           hotel: hotel,
         );
       }
@@ -151,6 +187,20 @@ class HotelService {
     String? pincode,
     String? landmark,
     String? photoUrl,
+    String? fssaiNumber,
+    String? fssaiPhotoUrl,
+    String? panNumber,
+    String? panPhotoUrl,
+    String? aadharNumber,
+    String? aadharPhotoUrl,
+    String? shopActNumber,
+    String? shopActPhotoUrl,
+    String? udyamAadharNumber,
+    String? udyamAadharPhotoUrl,
+    String? gstNumber,
+    String? gstPhotoUrl,
+    String? serviceType,
+    String? foodType,
   }) async {
     try {
       final token = await AuthService.instance.getSavedToken();
@@ -185,6 +235,20 @@ class HotelService {
               if (pincode != null) 'pincode': pincode,
               if (landmark != null) 'landmark': landmark,
               if (photoUrl != null) 'photo_url': photoUrl,
+              if (fssaiNumber != null) 'fssai_number': fssaiNumber.trim(),
+              if (fssaiPhotoUrl != null) 'fssai_photo_url': fssaiPhotoUrl,
+              if (panNumber != null) 'pan_number': panNumber.trim(),
+              if (panPhotoUrl != null) 'pan_photo_url': panPhotoUrl,
+              if (aadharNumber != null) 'aadhar_number': aadharNumber.trim(),
+              if (aadharPhotoUrl != null) 'aadhar_photo_url': aadharPhotoUrl,
+              if (shopActNumber != null) 'shop_act_number': shopActNumber.trim(),
+              if (shopActPhotoUrl != null) 'shop_act_photo_url': shopActPhotoUrl,
+              if (udyamAadharNumber != null) 'udyam_aadhar_number': udyamAadharNumber.trim(),
+              if (udyamAadharPhotoUrl != null) 'udyam_aadhar_photo_url': udyamAadharPhotoUrl,
+              if (gstNumber != null) 'gst_number': gstNumber.trim(),
+              if (gstPhotoUrl != null) 'gst_photo_url': gstPhotoUrl,
+              'service_type': serviceType ?? 'BOTH',
+              'food_type': foodType ?? 'BOTH',
             }),
           )
           .timeout(_timeout);

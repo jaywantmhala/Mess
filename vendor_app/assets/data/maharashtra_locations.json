@@ -1,0 +1,806 @@
+{
+  "state": "Maharashtra",
+  "districts": {
+    "Ahilyanagar": {
+      "talukas": [
+        "Ahilyanagar",
+        "Akole",
+        "Jamkhed",
+        "Karjat",
+        "Kopargaon",
+        "Nevasa",
+        "Parner",
+        "Pathardi",
+        "Rahata",
+        "Rahuri",
+        "Sangamner",
+        "Shevgaon",
+        "Shrigonda",
+        "Shrirampur"
+      ],
+      "regions": {}
+    },
+    "Akola": {
+      "talukas": [
+        "Akola",
+        "Akot",
+        "Balapur",
+        "Barshitakli",
+        "Murtizapur",
+        "Patur",
+        "Telhara"
+      ],
+      "regions": {}
+    },
+    "Amravati": {
+      "talukas": [
+        "Achalpur",
+        "Amravati",
+        "Anjangaon Surji",
+        "Bhatkuli",
+        "Chandur Railway",
+        "Chandurbazar",
+        "Chikhaldara",
+        "Daryapur",
+        "Dhamangaon Railway",
+        "Dharni",
+        "Morshi",
+        "Nandgaon Khandeshwar",
+        "Tiosa",
+        "Warud"
+      ],
+      "regions": {}
+    },
+    "Beed": {
+      "talukas": [
+        "Ambajogai",
+        "Ashti",
+        "Beed",
+        "Dharur",
+        "Georai",
+        "Kaij",
+        "Majalgaon",
+        "Parli",
+        "Patoda",
+        "Shirur Kasar",
+        "Wadwani"
+      ],
+      "regions": {}
+    },
+    "Bhandara": {
+      "talukas": [
+        "Bhandara",
+        "Lakhandur",
+        "Lakhani",
+        "Mohadi",
+        "Pauni",
+        "Sakoli",
+        "Tumsar"
+      ],
+      "regions": {}
+    },
+    "Buldhana": {
+      "talukas": [
+        "Buldhana",
+        "Chikhli",
+        "Deulgaon Raja",
+        "Jalgaon Jamod",
+        "Khamgaon",
+        "Lonar",
+        "Malkapur",
+        "Mehkar",
+        "Motala",
+        "Nandura",
+        "Sangrampur",
+        "Shegaon",
+        "Sindkhed Raja"
+      ],
+      "regions": {}
+    },
+    "Chandrapur": {
+      "talukas": [
+        "Ballarpur",
+        "Bhadravati",
+        "Brahmapuri",
+        "Chandrapur",
+        "Chimur",
+        "Gondpipri",
+        "Jiwati",
+        "Korpana",
+        "Mul",
+        "Nagbhid",
+        "Pombhurna",
+        "Rajura",
+        "Saoli",
+        "Sindewahi",
+        "Warora"
+      ],
+      "regions": {}
+    },
+    "Chhatrapati Sambhajinagar": {
+      "talukas": [
+        "Chhatrapati Sambhajinagar",
+        "Gangapur",
+        "Kannad",
+        "Khultabad",
+        "Paithan",
+        "Phulambri",
+        "Sillod",
+        "Soegaon",
+        "Vaijapur"
+      ],
+      "regions": {}
+    },
+    "Dharashiv": {
+      "talukas": [
+        "Bhum",
+        "Dharashiv",
+        "Kalamb",
+        "Lohara",
+        "Paranda",
+        "Tuljapur",
+        "Umarga",
+        "Washi"
+      ],
+      "regions": {}
+    },
+    "Dhule": {
+      "talukas": [
+        "Dhule",
+        "Sakri",
+        "Shindkheda",
+        "Shirpur"
+      ],
+      "regions": {}
+    },
+    "Gadchiroli": {
+      "talukas": [
+        "Aheri",
+        "Armori",
+        "Bhamragad",
+        "Chamorshi",
+        "Desaiganj",
+        "Dhanora",
+        "Etapalli",
+        "Gadchiroli",
+        "Korchi",
+        "Kurkheda",
+        "Mulchera",
+        "Sironcha"
+      ],
+      "regions": {}
+    },
+    "Gondia": {
+      "talukas": [
+        "Amgaon",
+        "Arjuni Morgaon",
+        "Deori",
+        "Gondia",
+        "Goregaon",
+        "Sadak Arjuni",
+        "Salekasa",
+        "Tirora"
+      ],
+      "regions": {}
+    },
+    "Hingoli": {
+      "talukas": [
+        "Aundha Nagnath",
+        "Basmath",
+        "Hingoli",
+        "Kalamnuri",
+        "Sengaon"
+      ],
+      "regions": {}
+    },
+    "Jalgaon": {
+      "talukas": [
+        "Amalner",
+        "Bhadgaon",
+        "Bhusawal",
+        "Bodwad",
+        "Chalisgaon",
+        "Chopda",
+        "Dharangaon",
+        "Erandol",
+        "Jalgaon",
+        "Jamner",
+        "Muktainagar",
+        "Pachora",
+        "Parola",
+        "Raver",
+        "Yawal"
+      ],
+      "regions": {}
+    },
+    "Jalna": {
+      "talukas": [
+        "Ambad",
+        "Badnapur",
+        "Bhokardan",
+        "Ghansawangi",
+        "Jafrabad",
+        "Jalna",
+        "Mantha",
+        "Partur"
+      ],
+      "regions": {}
+    },
+    "Kolhapur": {
+      "talukas": [
+        "Ajra",
+        "Bhudargad",
+        "Chandgad",
+        "Gaganbawada",
+        "Hatkanangale",
+        "Kagal",
+        "Karvir",
+        "Panhala",
+        "Radhanagari",
+        "Shahuwadi",
+        "Shirol"
+      ],
+      "regions": {}
+    },
+    "Latur": {
+      "talukas": [
+        "Ahmedpur",
+        "Ausa",
+        "Chakur",
+        "Deoni",
+        "Jalkot",
+        "Latur",
+        "Nilanga",
+        "Renapur",
+        "Shirur Anantpal",
+        "Udgir"
+      ],
+      "regions": {}
+    },
+    "Mumbai City": {
+      "talukas": [
+        "Mumbai City"
+      ],
+      "regions": {}
+    },
+    "Mumbai Suburban": {
+      "talukas": [
+        "Andheri",
+        "Borivali",
+        "Kurla"
+      ],
+      "regions": {}
+    },
+    "Nagpur": {
+      "talukas": [
+        "Bhiwapur",
+        "Hingna",
+        "Kalmeshwar",
+        "Kamptee",
+        "Katol",
+        "Kuhi",
+        "Mouda",
+        "Nagpur Rural",
+        "Nagpur Urban",
+        "Narkhed",
+        "Parseoni",
+        "Ramtek",
+        "Saoner",
+        "Umred"
+      ],
+      "regions": {}
+    },
+    "Nanded": {
+      "talukas": [
+        "Ardhapur",
+        "Bhokar",
+        "Biloli",
+        "Deglur",
+        "Dharmabad",
+        "Hadgaon",
+        "Himayatnagar",
+        "Kandhar",
+        "Kinwat",
+        "Loha",
+        "Mahur",
+        "Mudkhed",
+        "Mukhed",
+        "Naigaon",
+        "Nanded",
+        "Umri"
+      ],
+      "regions": {}
+    },
+    "Nandurbar": {
+      "talukas": [
+        "Akkalkuwa",
+        "Akrani",
+        "Nandurbar",
+        "Navapur",
+        "Shahada",
+        "Taloda"
+      ],
+      "regions": {}
+    },
+    "Nashik": {
+      "talukas": [
+        "Baglan",
+        "Chandwad",
+        "Deola",
+        "Dindori",
+        "Igatpuri",
+        "Kalwan",
+        "Malegaon",
+        "Nandgaon",
+        "Nashik",
+        "Niphad",
+        "Peint",
+        "Sinnar",
+        "Surgana",
+        "Trimbakeshwar",
+        "Yeola"
+      ],
+      "regions": {}
+    },
+    "Palghar": {
+      "talukas": [
+        "Dahanu",
+        "Jawhar",
+        "Mokhada",
+        "Palghar",
+        "Talasari",
+        "Vasai",
+        "Vikramgad",
+        "Wada"
+      ],
+      "regions": {
+        "Vasai-Virar and surrounding areas": [
+          "Mira Road",
+          "Bhayandar East",
+          "Bhayandar West",
+          "Uttan",
+          "Dongri",
+          "Rai",
+          "Morva",
+          "Pali",
+          "Chena",
+          "Bhayandar Station Road",
+          "Vasai West",
+          "Vasai East",
+          "Vasai Road",
+          "Nalasopara West",
+          "Nalasopara East",
+          "Virar West",
+          "Virar East",
+          "Virar Station area",
+          "Naigaon East",
+          "Naigaon West",
+          "Achole",
+          "Agashi",
+          "Arnala",
+          "Bolinj",
+          "Sopara",
+          "Pelhar",
+          "Waliv",
+          "Gokhivare",
+          "Evershine City",
+          "Chandansar",
+          "Manickpur",
+          "Papdy",
+          "Bhuigaon",
+          "Juchandra",
+          "Rajodi",
+          "Nirmal",
+          "Umelman"
+        ],
+        "Other nearby urban and industrial localities": [
+          "Dombivli MIDC",
+          "Ambernath MIDC",
+          "Badlapur MIDC",
+          "Taloja MIDC",
+          "Mahape MIDC",
+          "TTC Industrial Area",
+          "Tarapur-side industrial localities",
+          "JNPT logistics areas"
+        ]
+      }
+    },
+    "Parbhani": {
+      "talukas": [
+        "Gangakhed",
+        "Jintur",
+        "Manwath",
+        "Palam",
+        "Parbhani",
+        "Pathri",
+        "Purna",
+        "Selu",
+        "Sonpeth"
+      ],
+      "regions": {}
+    },
+    "Pune": {
+      "talukas": [
+        "Ambegaon",
+        "Baramati",
+        "Bhor",
+        "Daund",
+        "Haveli",
+        "Indapur",
+        "Junnar",
+        "Khed",
+        "Mawal",
+        "Mulshi",
+        "Pune City",
+        "Purandar",
+        "Shirur",
+        "Velhe"
+      ],
+      "regions": {
+        "PMC": [
+          "Shivajinagar",
+          "Deccan Gymkhana",
+          "Kothrud",
+          "Karve Nagar",
+          "Erandwane",
+          "Warje",
+          "Bavdhan",
+          "Aundh",
+          "Baner",
+          "Balewadi",
+          "Pashan",
+          "Sus",
+          "Model Colony",
+          "Senapati Bapat Road",
+          "Khadki",
+          "Yerawada",
+          "Kalyani Nagar",
+          "Viman Nagar",
+          "Dhanori",
+          "Lohegaon",
+          "Wadgaon Sheri",
+          "Kharadi",
+          "Chandan Nagar",
+          "Hadapsar",
+          "Mundhwa",
+          "Magarpatta City",
+          "Amanora Park Town",
+          "Wanowrie",
+          "Fatima Nagar",
+          "Kondhwa",
+          "NIBM Road",
+          "Undri",
+          "Pisoli",
+          "Dhankawadi",
+          "Katraj",
+          "Bibwewadi",
+          "Sahakarnagar",
+          "Parvati",
+          "Sinhagad Road",
+          "Dhayari",
+          "Ambegaon",
+          "Narhe",
+          "Swargate",
+          "Camp",
+          "Nana Peth",
+          "Bhawani Peth",
+          "Rasta Peth",
+          "Raviwar Peth",
+          "Sadashiv Peth",
+          "Narayan Peth",
+          "Guruwar Peth",
+          "Kasba Peth",
+          "Ghorpade Peth",
+          "Gultekdi",
+          "Market Yard",
+          "Ghorpuri",
+          "Fursungi-side localities",
+          "Khadki Bazar",
+          "Dapodi-side localities"
+        ],
+        "PCMC": [
+          "Pimpri",
+          "Chinchwad",
+          "Akurdi",
+          "Nigdi",
+          "Pradhikaran",
+          "Ravet",
+          "Kiwale",
+          "Mamurdi",
+          "Punawale",
+          "Tathawade",
+          "Wakad",
+          "Thergaon",
+          "Kalewadi",
+          "Rahatani",
+          "Pimple Saudagar",
+          "Pimple Gurav",
+          "Pimple Nilakh",
+          "Sangvi",
+          "Dapodi",
+          "Bhosari",
+          "Moshi",
+          "Dighi",
+          "Chikhali",
+          "Charholi Budruk",
+          "Dudulgaon",
+          "Kudalwadi",
+          "Nehrunagar",
+          "Kasarwadi",
+          "Phugewadi"
+        ],
+        "Pune Rural and Outskirts": [
+          "Shewalewadi",
+          "Fursungi",
+          "Saswad",
+          "Jejuri",
+          "Bhor",
+          "Velhe",
+          "Pirangut",
+          "Paud",
+          "Mulshi",
+          "Lavale",
+          "Bhugaon",
+          "Bhukum",
+          "Hinjawadi",
+          "Maan",
+          "Marunji",
+          "Nere",
+          "Gahunje",
+          "Talegaon Dabhade",
+          "Vadgaon Maval",
+          "Lonavala",
+          "Kamshet",
+          "Chakan",
+          "Mahalunge",
+          "Rajgurunagar",
+          "Khed",
+          "Narayangaon",
+          "Junnar",
+          "Shirur",
+          "Daund",
+          "Baramati",
+          "Indapur",
+          "Alandi",
+          "Dehu",
+          "Panshet",
+          "Khadakwasla",
+          "Ranjangaon",
+          "Shikrapur",
+          "Pabal",
+          "Manchar",
+          "Kalas",
+          "Khed Shivapur",
+          "Nasrapur",
+          "Khandala",
+          "Kanhe",
+          "Somatane",
+          "Varale",
+          "Vadgaon Sheri outskirts"
+        ]
+      }
+    },
+    "Raigad": {
+      "talukas": [
+        "Alibag",
+        "Karjat",
+        "Khalapur",
+        "Mahad",
+        "Mangaon",
+        "Mhasla",
+        "Murud",
+        "Panvel",
+        "Pen",
+        "Poladpur",
+        "Roha",
+        "Shrivardhan",
+        "Sudhagad",
+        "Tala",
+        "Uran"
+      ],
+      "regions": {
+        "Navi Mumbai and Panvel region": [
+          "Vashi",
+          "Sanpada",
+          "Juinagar",
+          "Nerul",
+          "Seawoods",
+          "CBD Belapur",
+          "Belapur",
+          "Kharghar",
+          "Kopar Khairane",
+          "Ghansoli",
+          "Airoli",
+          "Rabale",
+          "Turbhe",
+          "Pawane",
+          "Mahape",
+          "TTC Industrial Area",
+          "Digha",
+          "Bonkode",
+          "Juhugaon",
+          "Sector 17 Vashi",
+          "Sector 15 CBD Belapur",
+          "Nerul East",
+          "Nerul West",
+          "Palm Beach Road localities",
+          "Kamothe",
+          "Kalamboli",
+          "Khandeshwar",
+          "New Panvel East",
+          "New Panvel West",
+          "Pushpak Nagar",
+          "Ulwe",
+          "Dronagiri",
+          "Taloja",
+          "Roadpali",
+          "Karanjade",
+          "Navade",
+          "Owe Camp",
+          "Pendhar",
+          "Rasayani",
+          "Uran",
+          "JNPT",
+          "Nhava-Sheva",
+          "Panvel",
+          "Old Panvel",
+          "Palaspe",
+          "Adai",
+          "Vichumbe",
+          "Sukapur",
+          "Khanda Colony",
+          "Newale",
+          "Chowk",
+          "Nere",
+          "Poyanje",
+          "Chirle",
+          "Jaskhar",
+          "Bokadvira"
+        ],
+        "Karjat, Khopoli and nearby areas": [
+          "Karjat",
+          "Neral",
+          "Bhivpuri Road",
+          "Shelu",
+          "Vangani",
+          "Chowk",
+          "Khopoli",
+          "Khalapur",
+          "Pali",
+          "Rasayani"
+        ]
+      }
+    },
+    "Ratnagiri": {
+      "talukas": [
+        "Chiplun",
+        "Dapoli",
+        "Guhagar",
+        "Khed",
+        "Lanja",
+        "Mandangad",
+        "Sangameshwar",
+        "Ratnagiri",
+        "Rajapur"
+      ],
+      "regions": {}
+    },
+    "Sangli": {
+      "talukas": [
+        "Atpadi",
+        "Jat",
+        "Kadegaon",
+        "Kavathe Mahankal",
+        "Khanapur",
+        "Miraj",
+        "Palus",
+        "Shirala",
+        "Tasgaon",
+        "Walwa"
+      ],
+      "regions": {}
+    },
+    "Satara": {
+      "talukas": [
+        "Jaoli",
+        "Karad",
+        "Khandala",
+        "Khatav",
+        "Koregaon",
+        "Mahabaleshwar",
+        "Man",
+        "Patan",
+        "Phaltan",
+        "Satara",
+        "Wai"
+      ],
+      "regions": {}
+    },
+    "Sindhudurg": {
+      "talukas": [
+        "Devgad",
+        "Dodamarg",
+        "Kankavli",
+        "Kudal",
+        "Malvan",
+        "Sawantwadi",
+        "Vaibhavwadi",
+        "Vengurla"
+      ],
+      "regions": {}
+    },
+    "Solapur": {
+      "talukas": [
+        "Akkalkot",
+        "Barshi",
+        "Karmala",
+        "Madha",
+        "Malshiras",
+        "Mangalvedhe",
+        "Mohol",
+        "North Solapur",
+        "Pandharpur",
+        "Sangole",
+        "South Solapur"
+      ],
+      "regions": {}
+    },
+    "Thane": {
+      "talukas": [
+        "Ambernath",
+        "Bhiwandi",
+        "Kalyan",
+        "Murbad",
+        "Shahapur",
+        "Thane",
+        "Ulhasnagar"
+      ],
+      "regions": {}
+    },
+    "Wardha": {
+      "talukas": [
+        "Arvi",
+        "Ashti",
+        "Deoli",
+        "Hinganghat",
+        "Karanja",
+        "Samudrapur",
+        "Seloo",
+        "Wardha"
+      ],
+      "regions": {}
+    },
+    "Washim": {
+      "talukas": [
+        "Karanja",
+        "Malegaon",
+        "Mangrulpir",
+        "Manora",
+        "Risod",
+        "Washim"
+      ],
+      "regions": {}
+    },
+    "Yavatmal": {
+      "talukas": [
+        "Arni",
+        "Babhulgaon",
+        "Darwha",
+        "Digras",
+        "Ghatanji",
+        "Kalamb",
+        "Kelapur",
+        "Mahagaon",
+        "Maregaon",
+        "Ner",
+        "Pusad",
+        "Ralegaon",
+        "Umarkhed",
+        "Wani",
+        "Yavatmal",
+        "Zari-Jamani"
+      ],
+      "regions": {}
+    }
+  }
+}

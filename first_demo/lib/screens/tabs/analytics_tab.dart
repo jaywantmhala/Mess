@@ -1,22 +1,8 @@
+// lib/screens/tabs/analytics_tab.dart
 import 'package:flutter/material.dart';
-
-class LedgerItemModel {
-  final String title;
-  final String date;
-  final String changeText;
-  final String amountText;
-  final bool isCredit; // positive balance change vs negative
-  final IconData icon;
-
-  LedgerItemModel({
-    required this.title,
-    required this.date,
-    required this.changeText,
-    required this.amountText,
-    required this.isCredit,
-    required this.icon,
-  });
-}
+import '../../services/wallet_service.dart';
+import '../../models/wallet.dart';
+import '../hotels_near_you_screen.dart';
 
 class AnalyticsTab extends StatefulWidget {
   const AnalyticsTab({super.key});
@@ -26,433 +12,534 @@ class AnalyticsTab extends StatefulWidget {
 }
 
 class _AnalyticsTabState extends State<AnalyticsTab> {
-  final List<LedgerItemModel> _transactions = [
-    LedgerItemModel(
-      title: 'Token Subscription Renewed',
-      date: 'July 01, 2026',
-      changeText: '+30 Breakfast, +30 Lunch',
-      amountText: '₹2,400',
-      isCredit: true,
-      icon: Icons.add_card_rounded,
-    ),
-    LedgerItemModel(
-      title: 'Dined at Zenith Gold Canteen',
-      date: 'Today, 1:15 PM',
-      changeText: '-1 Lunch Token',
-      amountText: 'Deducted',
-      isCredit: false,
-      icon: Icons.restaurant_rounded,
-    ),
-    LedgerItemModel(
-      title: 'Meal Refund: Dinner Cancelled',
-      date: 'Yesterday, 6:00 PM',
-      changeText: '+1 Dinner Token Refunded',
-      amountText: '₹80',
-      isCredit: true,
-      icon: Icons.history_rounded,
-    ),
-    LedgerItemModel(
-      title: 'Dined at Veg Oasis Mess',
-      date: 'July 02, 8:30 AM',
-      changeText: '-1 Breakfast Token',
-      amountText: 'Deducted',
-      isCredit: false,
-      icon: Icons.flatware_rounded,
-    ),
-    LedgerItemModel(
-      title: 'Guest Pass Purchased',
-      date: 'June 29, 2026',
-      changeText: '-1 Lunch Token',
-      amountText: '₹120',
-      isCredit: false,
-      icon: Icons.qr_code_2_rounded,
-    ),
-  ];
+  // ── Design Tokens matching reference photo 100% ────────────────────────────
+  static const Color _brandOrange  = Color(0xFFF58220);
+  static const Color _gradientEnd  = Color(0xFFE65100);
+  static const Color _bgWarm       = Color(0xFFF6F8FA);
+  static const Color _white        = Colors.white;
+  static const Color _ink          = Color(0xFF1A1A2E);
+  static const Color _greySub      = Color(0xFF6B7280);
+  static const Color _cardBorder   = Color(0xFFF3F4F6);
+  static const Color _greenText    = Color(0xFF10B981);
+  static const Color _greenBg      = Color(0xFFE6F4EA);
+
+  List<WalletTransaction> _walletTransactions = [];
+  bool _isLoading = true;
+  String _selectedFilter = 'This Week';
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchTransactions();
+    WalletService.instance.transactionNotifier.addListener(_onTransactionUpdate);
+  }
+
+  @override
+  void dispose() {
+    WalletService.instance.transactionNotifier.removeListener(_onTransactionUpdate);
+    super.dispose();
+  }
+
+  void _onTransactionUpdate() {
+    _fetchTransactions();
+  }
+
+  Future<void> _fetchTransactions() async {
+    if (mounted) setState(() => _isLoading = true);
+    try {
+      final txs = await WalletService.instance.getTransactions();
+      if (mounted) {
+        setState(() {
+          _walletTransactions = txs;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  String _formatDate(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inDays == 0 && now.day == dt.day) {
+      final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+      final min = dt.minute < 10 ? '0${dt.minute}' : '${dt.minute}';
+      return 'Today, $hour:$min $ampm';
+    } else if (diff.inDays == 1 || (now.day - dt.day == 1 && diff.inDays < 2)) {
+      final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+      final min = dt.minute < 10 ? '0${dt.minute}' : '${dt.minute}';
+      return 'Yesterday, $hour:$min $ampm';
+    } else {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      final month = months[dt.month - 1];
+      final hour = dt.hour > 12 ? dt.hour - 12 : (dt.hour == 0 ? 12 : dt.hour);
+      final ampm = dt.hour >= 12 ? 'PM' : 'AM';
+      final min = dt.minute < 10 ? '0${dt.minute}' : '${dt.minute}';
+      return '$month ${dt.day}, $hour:$min $ampm';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    return SafeArea(
-      bottom: false,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20.0, 15.0, 20.0, 0),
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Header
-              const Text(
-                'Dining Ledger & Stats',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: Colors.white,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              Text(
-                'Track your meal consumption and active smart tokens.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: Colors.white.withOpacity(0.5),
-                ),
-              ),
-              const SizedBox(height: 25),
+    final mq = MediaQuery.of(context);
+    final isWide = mq.size.width > 600;
 
-              // 2. Token Counters Row (Circular Progress Indicators)
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildTokenProgressCard(
-                    title: 'Breakfast',
-                    remaining: 18,
-                    total: 30,
-                    color: const Color(0xFF00C6FF),
-                  ),
-                  _buildTokenProgressCard(
-                    title: 'Lunch',
-                    remaining: 24,
-                    total: 30,
-                    color: const Color(0xFF9000FF),
-                  ),
-                  _buildTokenProgressCard(
-                    title: 'Dinner',
-                    remaining: 15,
-                    total: 30,
-                    color: const Color(0xFFFF3366),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 28),
-
-              // 3. Programmatic Custom Dining Chart
-              const Text(
-                'Weekly Dining Attendance (%)',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                height: 160,
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF080F1E).withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.04),
-                  ),
-                ),
-                child: CustomPaint(
-                  painter: DiningChartPainter(),
-                ),
-              ),
-              const SizedBox(height: 28),
-
-              // 4. Ledger Transaction List
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text(
-                    'Recent Transactions',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 0.5,
-                    ),
-                  ),
-                  Text(
-                    'See All',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Color(0xFF00C6FF),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _transactions.length,
-                padding: const EdgeInsets.only(bottom: 90),
-                itemBuilder: (context, index) {
-                  final tx = _transactions[index];
-
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF080F1E).withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.04),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        // Icon Circle
-                        Container(
-                          width: 38,
-                          height: 38,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: tx.isCredit
-                                ? const Color(0xFF00FF87).withOpacity(0.1)
-                                : const Color(0xFF00C6FF).withOpacity(0.1),
-                          ),
-                          alignment: Alignment.center,
-                          child: Icon(
-                            tx.icon,
-                            color: tx.isCredit ? const Color(0xFF00FF87) : const Color(0xFF00C6FF),
-                            size: 18,
+    return Scaffold(
+      backgroundColor: _bgWarm,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: _brandOrange))
+          : SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: isWide ? 540 : double.infinity),
+                  child: Stack(
+                    children: [
+                      // ── 1. Top Orange Header Banner with Custom Organic S-Wave Curve ───
+                      ClipPath(
+                        clipper: HeaderCurveClipper(),
+                        child: Container(
+                          height: 165,
+                          width: double.infinity,
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              colors: [_brandOrange, _gradientEnd],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 14),
-                        
-                        // Transaction text details
-                        Expanded(
-                          child: Column(
+                      ),
+
+                      // ── 2. Header Top Bar Content (Ledger Title & Filter Pill) ────────
+                      SafeArea(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                tx.title,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
+                              // Left: Clipboard Icon & Title Stack
+                              Expanded(
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: _white.withOpacity(0.22),
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: const Icon(
+                                        Icons.assignment_outlined,
+                                        color: _white,
+                                        size: 26,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: const [
+                                          Text(
+                                            'Ledger',
+                                            style: TextStyle(
+                                              color: _white,
+                                              fontSize: 26,
+                                              fontWeight: FontWeight.w900,
+                                              letterSpacing: -0.4,
+                                            ),
+                                          ),
+                                          SizedBox(height: 2),
+                                          Text(
+                                            'Track your token usage and transactions',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w500,
+                                              height: 1.15,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                tx.changeText,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.white.withOpacity(0.6),
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                tx.date,
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  color: Colors.white.withOpacity(0.4),
+
+                              // Right: "This Week ˅" Pill Dropdown
+                              PopupMenuButton<String>(
+                                initialValue: _selectedFilter,
+                                onSelected: (val) => setState(() => _selectedFilter = val),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                                itemBuilder: (ctx) => const [
+                                  PopupMenuItem(value: 'This Week', child: Text('This Week')),
+                                  PopupMenuItem(value: 'This Month', child: Text('This Month')),
+                                  PopupMenuItem(value: 'All Time', child: Text('All Time')),
+                                ],
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                                  decoration: BoxDecoration(
+                                    color: _white,
+                                    borderRadius: BorderRadius.circular(20),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.08),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.calendar_today_rounded, color: _brandOrange, size: 14),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        _selectedFilter,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w800,
+                                          color: _ink,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.keyboard_arrow_down_rounded, color: _brandOrange, size: 18),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
                           ),
                         ),
+                      ),
 
-                        // Transaction cost/refund badge
-                        Text(
-                          tx.isCredit ? '+${tx.amountText}' : tx.amountText,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: tx.isCredit ? const Color(0xFF00FF87) : Colors.white.withOpacity(0.7),
-                          ),
+                      // ── 3. Main Content Stack ────────────────────────────────────────
+                      Padding(
+                        padding: const EdgeInsets.only(top: 155, left: 16, right: 16, bottom: 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // "Recent Transactions" Section Header
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Recent Transactions',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    color: _ink,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                                GestureDetector(
+                                  onTap: () {},
+                                  child: Row(
+                                    children: const [
+                                      Text(
+                                        'See All',
+                                        style: TextStyle(
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.w800,
+                                          color: _brandOrange,
+                                        ),
+                                      ),
+                                      SizedBox(width: 2),
+                                      Icon(Icons.chevron_right_rounded, color: _brandOrange, size: 16),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+
+                            // ── 4. Transaction Cards List ────────────────────────────────
+                            if (_walletTransactions.isNotEmpty)
+                              ..._walletTransactions.map((tx) => Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: _buildTransactionCard(
+                                      title: tx.description,
+                                      balanceAfter: tx.balanceAfter,
+                                      timeStr: _formatDate(tx.createdAt),
+                                      amount: tx.amount,
+                                      isCredit: tx.isCredit,
+                                    ),
+                                  ))
+                            else
+                              Container(
+                                padding: const EdgeInsets.all(24),
+                                width: double.infinity,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: const Color(0xFFF3F4F6)),
+                                ),
+                                child: const Column(
+                                  children: [
+                                    Icon(Icons.receipt_long_rounded, size: 40, color: Color(0xFF9CA3AF)),
+                                    SizedBox(height: 8),
+                                    Text(
+                                      'No transactions yet',
+                                      style: TextStyle(
+                                        color: Color(0xFF6B7280),
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            const SizedBox(height: 18),
+
+                            // ── 5. Bottom "Enjoy hassle-free dining!" Banner ───────────────
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFF5F0),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: const Color(0xFFFFE8DD), width: 1.2),
+                              ),
+                              child: Row(
+                                children: [
+                                  // Left Vibrant Orange Flatware Circle Badge
+                                  Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: const BoxDecoration(
+                                      color: _brandOrange,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Center(
+                                      child: Icon(Icons.flatware_rounded, color: _white, size: 24),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+
+                                  // Center Text Column
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: const [
+                                        Text(
+                                          'Enjoy hassle-free dining!',
+                                          style: TextStyle(
+                                            fontSize: 14.5,
+                                            fontWeight: FontWeight.w900,
+                                            color: _ink,
+                                          ),
+                                        ),
+                                        SizedBox(height: 2),
+                                        Text(
+                                          'Use your tokens to order delicious meals from your favorite restaurants.',
+                                          style: TextStyle(
+                                            fontSize: 11.5,
+                                            color: _greySub,
+                                            fontWeight: FontWeight.w500,
+                                            height: 1.18,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+
+                                  // Right Outline Pill Button: Browse Messes >
+                                  GestureDetector(
+                                    onTap: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(builder: (_) => const HotelsNearYouScreen()),
+                                    ),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: _white,
+                                        borderRadius: BorderRadius.circular(18),
+                                        border: Border.all(color: _brandOrange, width: 1.2),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: const [
+                                          Text(
+                                            'Browse Messes',
+                                            style: TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w900,
+                                              color: _brandOrange,
+                                            ),
+                                          ),
+                                          SizedBox(width: 3),
+                                          Icon(Icons.chevron_right_rounded, color: _brandOrange, size: 16),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  );
-                },
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ],
-          ),
-        ),
-      ),
+            ),
     );
   }
 
-  Widget _buildTokenProgressCard({
+  // ── Helper: Transaction Card Widget ────────────────────────────────────────
+  Widget _buildTransactionCard({
     required String title,
-    required int remaining,
-    required int total,
-    required Color color,
+    required double balanceAfter,
+    required String timeStr,
+    required double amount,
+    required bool isCredit,
   }) {
-    final progressVal = remaining / total;
-
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 5),
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
-        decoration: BoxDecoration(
-          color: const Color(0xFF080F1E).withOpacity(0.9),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.04),
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _cardBorder, width: 1.2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.035),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
-        ),
-        child: Column(
-          children: [
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: Colors.white.withOpacity(0.6),
-              ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Left Icon Box (Soft Mint Green Circle with Wallet Icon)
+          Container(
+            width: 46,
+            height: 46,
+            decoration: const BoxDecoration(
+              color: _greenBg,
+              shape: BoxShape.circle,
             ),
-            const SizedBox(height: 14),
-            // Custom circular progress with centered text
-            Stack(
-              alignment: Alignment.center,
+            child: Icon(
+              isCredit ? Icons.account_balance_wallet_outlined : Icons.receipt_long_rounded,
+              color: _greenText,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 12),
+
+          // Title & Subtitle Column
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(
-                  width: 55,
-                  height: 55,
-                  child: CircularProgressIndicator(
-                    value: progressVal,
-                    strokeWidth: 5.5,
-                    backgroundColor: Colors.white.withOpacity(0.05),
-                    color: color,
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w800,
+                    color: _ink,
+                    height: 1.2,
                   ),
                 ),
+                const SizedBox(height: 4),
                 Text(
-                  '$remaining',
+                  'Balance after: ₹${balanceAfter.toStringAsFixed(2)}',
                   style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    fontSize: 12,
+                    color: _greySub,
+                    fontWeight: FontWeight.w500,
                   ),
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    const Icon(Icons.access_time_rounded, color: _greySub, size: 13),
+                    const SizedBox(width: 4),
+                    Text(
+                      timeStr,
+                      style: const TextStyle(
+                        fontSize: 11.5,
+                        color: _greySub,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Text(
-              'of $total tokens',
-              style: TextStyle(
-                fontSize: 10,
-                color: Colors.white.withOpacity(0.4),
+          ),
+          const SizedBox(width: 8),
+
+          // Price & Status Badge Column
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                '${isCredit ? '+' : '-'}₹${amount.toStringAsFixed(2)}',
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w900,
+                  color: _greenText,
+                ),
               ),
-            ),
-          ],
-        ),
+              const SizedBox(height: 6),
+
+              // Mint Green "Success" Tag Badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
+                decoration: BoxDecoration(
+                  color: _greenBg,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'Success',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: _greenText,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-// Custom Painter to draw a modern glowing weekly attendance line chart
-class DiningChartPainter extends CustomPainter {
+// ─────────────────────────────────────────────────────────────────────────────
+// Custom Clipper for Header Orange Background Curve
+// ─────────────────────────────────────────────────────────────────────────────
+
+class HeaderCurveClipper extends CustomClipper<Path> {
   @override
-  void paint(Canvas canvas, Size size) {
-    final paintGrid = Paint()
-      ..color = Colors.white.withOpacity(0.02)
-      ..strokeWidth = 1.0;
+  Path getClip(Size size) {
+    final path = Path();
+    path.lineTo(0, size.height - 30);
 
-    // Draw horizontal grid lines
-    final double gridRows = 4;
-    for (int i = 0; i <= gridRows; i++) {
-      final double y = size.height * (i / gridRows);
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), paintGrid);
-    }
-
-    // Weekly attendance percentages: Mon: 80%, Tue: 90%, Wed: 70%, Thu: 100%, Fri: 85%, Sat: 50%, Sun: 95%
-    final List<double> values = [0.80, 0.90, 0.70, 1.0, 0.85, 0.40, 0.95];
-    final List<String> days = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
-    final double paddingX = 15.0;
-    final double usableWidth = size.width - (paddingX * 2);
-    final double stepX = usableWidth / (values.length - 1);
-
-    final List<Offset> points = [];
-    for (int i = 0; i < values.length; i++) {
-      final double x = paddingX + (i * stepX);
-      // In Flutter canvas, (0,0) is top-left, so we invert Y axis
-      final double y = size.height * (1.0 - values[i]) * 0.8 + (size.height * 0.1);
-      points.add(Offset(x, y));
-    }
-
-    // 1. Draw glowing gradient area under the curve
-    final Path areaPath = Path()
-      ..moveTo(points.first.dx, size.height);
-    for (var pt in points) {
-      areaPath.lineTo(pt.dx, pt.dy);
-    }
-    areaPath.lineTo(points.last.dx, size.height);
-    areaPath.close();
-
-    final areaPaint = Paint()
-      ..shader = LinearGradient(
-        colors: [
-          const Color(0xFF00C6FF).withOpacity(0.20),
-          const Color(0xFF00C6FF).withOpacity(0.00),
-        ],
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-      ).createShader(Rect.fromLTRB(0, 0, size.width, size.height));
-    canvas.drawPath(areaPath, areaPaint);
-
-    // 2. Draw the connection path line
-    final Path linePath = Path()..moveTo(points.first.dx, points.first.dy);
-    for (int i = 1; i < points.length; i++) {
-      // Use cubic curves for smooth flowing path (optional, let's use standard line segments for sharp look)
-      linePath.lineTo(points[i].dx, points[i].dy);
-    }
-
-    final linePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0
-      ..strokeCap = StrokeCap.round
-      ..shader = const LinearGradient(
-        colors: [
-          Color(0xFF9000FF),
-          Color(0xFF00C6FF),
-        ],
-      ).createShader(Rect.fromLTRB(0, 0, size.width, size.height));
-    canvas.drawPath(linePath, linePaint);
-
-    // 3. Draw glow filter around points
-    final pointShadowPaint = Paint()
-      ..color = const Color(0xFF00C6FF).withOpacity(0.5)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0);
-
-    final pointPaint = Paint()
-      ..color = Colors.white
-      ..style = PaintingStyle.fill;
-
-    final borderPointPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0
-      ..color = const Color(0xFF00C6FF);
-
-    final TextPainter textPainter = TextPainter(
-      textDirection: TextDirection.ltr,
+    path.cubicTo(
+      size.width * 0.35, size.height + 30,
+      size.width * 0.65, size.height - 60,
+      size.width, size.height - 40,
     );
 
-    for (int i = 0; i < points.length; i++) {
-      final pt = points[i];
-      // Draw outer point glows
-      canvas.drawCircle(pt, 5.0, pointShadowPaint);
-      canvas.drawCircle(pt, 4.0, borderPointPaint);
-      canvas.drawCircle(pt, 2.0, pointPaint);
-
-      // Draw day label text below X axis
-      textPainter.text = TextSpan(
-        text: days[i],
-        style: TextStyle(
-          fontSize: 9,
-          fontWeight: FontWeight.bold,
-          color: Colors.white.withOpacity(0.4),
-        ),
-      );
-      textPainter.layout();
-      textPainter.paint(
-        canvas,
-        Offset(pt.dx - (textPainter.width / 2), size.height - textPainter.height + 4),
-      );
-    }
+    path.lineTo(size.width, 0);
+    path.close();
+    return path;
   }
 
   @override
-  bool shouldRepaint(covariant DiningChartPainter oldDelegate) {
-    return false;
-  }
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => true;
 }

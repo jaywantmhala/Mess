@@ -2,9 +2,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'driver_auth_service.dart';
+import '../utils/app_config.dart';
 
-const String _baseIp = '127.0.0.1';
-const String _baseUrl = 'http://$_baseIp:8000/api/driver/orders';
+final String _baseUrl = '$kApiHost/driver/orders';
 const Duration _timeout = Duration(seconds: 15);
 
 class DriverOrder {
@@ -21,6 +21,7 @@ class DriverOrder {
   final double customerLat;
   final double customerLng;
   final String customerName;
+  final String customerPhone;
 
   const DriverOrder({
     required this.orderId,
@@ -36,6 +37,7 @@ class DriverOrder {
     required this.customerLat,
     required this.customerLng,
     required this.customerName,
+    required this.customerPhone,
   });
 
   factory DriverOrder.fromJson(Map<String, dynamic> json) {
@@ -53,6 +55,7 @@ class DriverOrder {
       customerLat: double.tryParse(json['customer_lat'].toString()) ?? 0.0,
       customerLng: double.tryParse(json['customer_lng'].toString()) ?? 0.0,
       customerName: json['customer_name'] as String? ?? '',
+      customerPhone: json['customer_phone'] as String? ?? '',
     );
   }
 }
@@ -85,10 +88,14 @@ class DriverOrderService {
     }
   }
 
-  Future<bool> updateOrderStatus({required int orderId, required String status}) async {
+  Future<Map<String, dynamic>> updateOrderStatus({
+    required int orderId,
+    required String status,
+    String? otp,
+  }) async {
     try {
       final token = await DriverAuthService.instance.getSavedToken();
-      if (token == null) return false;
+      if (token == null) return {'success': false, 'message': 'No token'};
 
       final response = await http.post(
         Uri.parse('$_baseUrl/status'),
@@ -99,13 +106,14 @@ class DriverOrderService {
         body: jsonEncode({
           'order_id': orderId,
           'status': status,
+          if (otp != null) 'otp': otp,
         }),
       ).timeout(_timeout);
 
       final body = jsonDecode(response.body) as Map<String, dynamic>;
-      return body['success'] == true;
-    } catch (_) {
-      return false;
+      return body;
+    } catch (e) {
+      return {'success': false, 'message': e.toString()};
     }
   }
 
@@ -135,6 +143,28 @@ class DriverOrderService {
       return body;
     } catch (e) {
       return {'success': false, 'message': 'Failed to verify OTP: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> checkPendingTiffin() async {
+    try {
+      final token = await DriverAuthService.instance.getSavedToken();
+      if (token == null) {
+        return {'success': false, 'message': 'No driver token found.'};
+      }
+
+      final response = await http.get(
+        Uri.parse('$_baseUrl/pending_tiffin'),
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(_timeout);
+
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      return body;
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to check pending tiffin: $e'};
     }
   }
 }

@@ -26,9 +26,12 @@ $data = json_decode($dataJson, true) ?: [];
 require_once __DIR__ . '/fcm.php';
 
 if ($role === 'customer') {
-    FcmHelper::sendToCustomerDirect($id, $title, $body, $data);
+    $res = FcmHelper::sendToCustomerDirect($id, $title, $body, $data);
+    echo "[" . date('Y-m-d H:i:s') . "] Customer direct send result: " . ($res ? "SUCCESS" : "FAILED") . "\n";
 } elseif ($role === 'vendor') {
-    FcmHelper::sendToVendorDirect($id, $title, $body, $data);
+    $res = FcmHelper::sendToVendorDirect($id, $title, $body, $data);
+    echo "[" . date('Y-m-d H:i:s') . "] Vendor direct send result: " . ($res ? "SUCCESS" : "FAILED") . "\n";
 } elseif ($role === 'driver') {
-    FcmHelper::sendToDriverDirect($id, $title, $body, $data);
+    $res = FcmHelper::sendToDriverDirect($id, $title, $body, $data);
+    echo "[" . date('Y-m-d H:i:s') . "] Driver direct send result: " . ($res ? "SUCCESS" : "FAILED") . "\n";
 }

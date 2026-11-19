@@ -69,6 +69,12 @@ $stmt->execute([
 ]);
 $driverId = (int)$pdo->lastInsertId();
 
+$fcmToken = trim($body['fcm_token'] ?? '');
+if (!empty($fcmToken)) {
+    $pdo->prepare("UPDATE drivers SET fcm_token = :fcm, updated_at = NOW() WHERE id = :id")
+        ->execute([':id' => $driverId, ':fcm' => $fcmToken]);
+}
+
 $stmt = $pdo->prepare("SELECT id, full_name, email, vehicle_number, phone_number, is_online, created_at FROM drivers WHERE id = :id");
 $stmt->execute([':id' => $driverId]);
 $driver = $stmt->fetch();

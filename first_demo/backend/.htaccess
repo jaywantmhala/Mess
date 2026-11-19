@@ -1,0 +1,25 @@
+# CORS Headers for Apache Web Server
+<IfModule mod_headers.c>
+    Header always set Access-Control-Allow-Origin "*"
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With, Accept, Origin"
+    Header always set Access-Control-Allow-Credentials "true"
+</IfModule>
+
+# Disable DirectorySlash to prevent Apache from issuing 301 redirects on API folder names
+<IfModule mod_dir.c>
+    DirectorySlash Off
+</IfModule>
+
+# URL Rewriting
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Return 200 OK directly for OPTIONS preflight requests without redirecting
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^(.*)$ - [R=200,L]
+
+    # Route all non-file requests to router.php (including API folder paths)
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteRule ^(.*)$ router.php [QSA,L]
+</IfModule>

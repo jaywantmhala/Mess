@@ -1,46 +1,136 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
   <base href="$FLUTTER_BASE_HREF">
-
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="Hungrily Foods Web Application">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="first_demo">
+  <meta name="apple-mobile-web-app-title" content="Hungrily Foods">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>first_demo</title>
+  <title>Hungrily Foods</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- Razorpay Standard Web Checkout Script -->
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script>
+    // Global variable to prevent duplicate active Razorpay instances
+    window._activeRazorpayInstance = null;
+
+    /**
+     * Standard Razorpay Web Checkout JS function
+     * Interoperable with Flutter Web JS callbacks
+     */
+    window.openRazorpayCheckout = function (optionsJson) {
+      console.log('🌐 [JS Checkout] openRazorpayCheckout called');
+
+      if (window._activeRazorpayInstance) {
+        console.warn('⚠️ [JS Checkout] Razorpay checkout instance is already open. Closing previous instance...');
+        try { window._activeRazorpayInstance.close(); } catch(e) {}
+        window._activeRazorpayInstance = null;
+      }
+
+      var data;
+      try {
+        data = typeof optionsJson === 'string' ? JSON.parse(optionsJson) : optionsJson;
+      } catch (err) {
+        console.error('❌ [JS Checkout] JSON parse error:', err);
+        if (window.onRazorpayWebFailure) {
+          window.onRazorpayWebFailure(JSON.stringify({
+            code: 'JSON_PARSE_ERROR',
+            description: 'Invalid JSON options passed to Razorpay'
+          }));
+        }
+        return;
+      }
+
+      var options = {
+        key: data.key,
+        amount: data.amount, // Integer in paise (e.g. 120000)
+        currency: data.currency || 'INR',
+        name: data.name || "Hungrily Foods",
+        description: data.description || "Subscription Plan Payment",
+        order_id: data.order_id,
+        prefill: {
+          name: data.customer_name || data.prefill?.name || '',
+          email: data.customer_email || data.prefill?.email || '',
+          contact: data.customer_phone || data.prefill?.contact || ''
+        },
+        theme: {
+          color: data.theme_color || '#F58220'
+        },
+        handler: function (response) {
+          console.log('🎉 [JS Checkout] Payment Success Handler Fired:', response);
+          window._activeRazorpayInstance = null;
+          if (window.onRazorpayWebSuccess) {
+            window.onRazorpayWebSuccess(JSON.stringify({
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature
+            }));
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            console.log('🚪 [JS Checkout] Modal Dismissed by Customer');
+            window._activeRazorpayInstance = null;
+            if (window.onRazorpayWebDismiss) {
+              window.onRazorpayWebDismiss('Payment checkout closed by customer');
+            }
+          }
+        }
+      };
+
+      try {
+        var razorpay = new Razorpay(options);
+
+        razorpay.on('payment.failed', function (response) {
+          console.error('❌ [JS Checkout] Payment Failed Event:', response.error);
+          window._activeRazorpayInstance = null;
+          if (window.onRazorpayWebFailure) {
+            window.onRazorpayWebFailure(JSON.stringify({
+              code: response.error ? response.error.code : 'PAYMENT_FAILED',
+              description: response.error ? response.error.description : 'Payment transaction failed',
+              source: response.error ? response.error.source : '',
+              step: response.error ? response.error.step : '',
+              reason: response.error ? response.error.reason : ''
+            }));
+          }
+        });
+
+        window._activeRazorpayInstance = razorpay;
+        razorpay.open();
+        console.log('🚀 [JS Checkout] Razorpay Web Checkout window opened successfully.');
+      } catch (ex) {
+        console.error('💥 [JS Checkout] Error instantiating Razorpay:', ex);
+        window._activeRazorpayInstance = null;
+        if (window.onRazorpayWebFailure) {
+          window.onRazorpayWebFailure(JSON.stringify({
+            code: 'INIT_ERROR',
+            description: ex.toString()
+          }));
+        }
+      }
+    };
+
+    // Alias for backwards compatibility
+    window.openRazorpayWebCheckout = function(optionsJson, successCb, errorCb) {
+      if (typeof optionsJson === 'string') {
+        window.openRazorpayCheckout(optionsJson);
+      } else {
+        window.openRazorpayCheckout(JSON.stringify(optionsJson));
+      }
+    };
+  </script>
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
-
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

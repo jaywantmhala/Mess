@@ -7,6 +7,8 @@ class OrderResult {
   final double remainingPayable;
   final double newWalletBalance;
   final String status;
+  final double? tiffinCharge;
+  final String? areaName;
 
   const OrderResult({
     required this.orderId,
@@ -15,6 +17,8 @@ class OrderResult {
     required this.remainingPayable,
     required this.newWalletBalance,
     required this.status,
+    this.tiffinCharge,
+    this.areaName,
   });
 
   factory OrderResult.fromJson(Map<String, dynamic> json) => OrderResult(
@@ -24,6 +28,8 @@ class OrderResult {
         remainingPayable: double.parse(json['remaining_payable'].toString()),
         newWalletBalance: double.parse(json['new_wallet_balance'].toString()),
         status: json['status'] as String? ?? 'PLACED',
+        tiffinCharge: json['tiffin_charge'] != null ? double.tryParse(json['tiffin_charge'].toString()) : null,
+        areaName: json['area_name'] as String?,
       );
 }
 
@@ -31,8 +37,10 @@ class OrderHistoryItem {
   final int orderId;
   final String hotelName;
   final String status;
+  final String mealType;
   final double grandTotal;
   final double walletDeducted;
+  final double? tiffinCharge;
   final int itemCount;
   final DateTime createdAt;
   final String tiffinReceivedToHotel;
@@ -41,8 +49,10 @@ class OrderHistoryItem {
     required this.orderId,
     required this.hotelName,
     required this.status,
+    this.mealType = 'Lunch',
     required this.grandTotal,
     required this.walletDeducted,
+    this.tiffinCharge,
     required this.itemCount,
     required this.createdAt,
     this.tiffinReceivedToHotel = 'pending',
@@ -53,8 +63,10 @@ class OrderHistoryItem {
         orderId: int.parse(json['order_id'].toString()),
         hotelName: json['hotel_name'] as String? ?? 'Unknown',
         status: json['status'] as String? ?? 'PLACED',
+        mealType: json['meal_type']?.toString() ?? 'Lunch',
         grandTotal: double.parse(json['grand_total'].toString()),
         walletDeducted: double.parse(json['wallet_deducted'].toString()),
+        tiffinCharge: json['tiffin_charge'] != null ? double.tryParse(json['tiffin_charge'].toString()) : null,
         itemCount: int.parse(json['item_count'].toString()),
         createdAt: DateTime.tryParse(json['created_at'] as String? ?? '') ??
             DateTime.now(),
@@ -66,11 +78,15 @@ class OrderDetailsItem {
   final String foodName;
   final int quantity;
   final double price;
+  final List<String> mandatoryItems;
+  final List<String> selectedOptionalItems;
 
   const OrderDetailsItem({
     required this.foodName,
     required this.quantity,
     required this.price,
+    this.mandatoryItems = const [],
+    this.selectedOptionalItems = const [],
   });
 
   factory OrderDetailsItem.fromJson(Map<String, dynamic> json) =>
@@ -78,6 +94,8 @@ class OrderDetailsItem {
         foodName: json['food_name'] as String? ?? '',
         quantity: int.parse(json['quantity'].toString()),
         price: double.parse(json['price'].toString()),
+        mandatoryItems: (json['mandatory_items'] as List? ?? []).map((e) => e.toString()).toList(),
+        selectedOptionalItems: (json['selected_optional_items'] as List? ?? []).map((e) => e.toString()).toList(),
       );
 }
 
@@ -85,6 +103,7 @@ class OrderDetailsHotel {
   final int id;
   final String hotelName;
   final String hotelAddress;
+  final String phoneNumber;
   final String rating;
   final String photoUrl;
   final double latitude;
@@ -94,6 +113,7 @@ class OrderDetailsHotel {
     required this.id,
     required this.hotelName,
     required this.hotelAddress,
+    this.phoneNumber = '',
     required this.rating,
     required this.photoUrl,
     required this.latitude,
@@ -105,6 +125,7 @@ class OrderDetailsHotel {
         id: int.parse(json['id'].toString()),
         hotelName: json['hotel_name'] as String? ?? '',
         hotelAddress: json['hotel_address'] as String? ?? '',
+        phoneNumber: json['phone_number']?.toString() ?? json['mobile_number']?.toString() ?? '',
         rating: json['rating'] as String? ?? '4.0',
         photoUrl: json['photo_url'] as String? ?? '',
         latitude: double.parse((json['latitude'] ?? 0.0).toString()),
@@ -117,7 +138,7 @@ class OrderDetailsDeliveryPartner {
   final String name;
   final String rating;
   final String avatarUrl;
-  final String phoneNumber;
+  String phoneNumber;
   final String vehicleNumber;
   double latitude;
   double longitude;
@@ -154,6 +175,7 @@ class OrderDetails {
   final double taxAmount;
   final double grandTotal;
   final double walletDeducted;
+  final double? tiffinCharge;
   final String paymentMethod;
   final String deliveryAddress;
   final String createdAt;
@@ -162,6 +184,8 @@ class OrderDetails {
   final OrderDetailsDeliveryPartner? deliveryPartner;
   final double customerLatitude;
   final double customerLongitude;
+  final String? deliveryOtp;
+  final String? deliveredAt;
 
   const OrderDetails({
     required this.orderId,
@@ -171,6 +195,7 @@ class OrderDetails {
     required this.taxAmount,
     required this.grandTotal,
     required this.walletDeducted,
+    this.tiffinCharge,
     required this.paymentMethod,
     required this.deliveryAddress,
     required this.createdAt,
@@ -179,6 +204,8 @@ class OrderDetails {
     this.deliveryPartner,
     required this.customerLatitude,
     required this.customerLongitude,
+    this.deliveryOtp,
+    this.deliveredAt,
   });
 
   factory OrderDetails.fromJson(Map<String, dynamic> json) {
@@ -191,6 +218,7 @@ class OrderDetails {
       taxAmount: double.parse(json['tax_amount'].toString()),
       grandTotal: double.parse(json['grand_total'].toString()),
       walletDeducted: double.parse(json['wallet_deducted'].toString()),
+      tiffinCharge: json['tiffin_charge'] != null ? double.tryParse(json['tiffin_charge'].toString()) : null,
       paymentMethod: json['payment_method'] as String? ?? 'UPI',
       deliveryAddress: json['delivery_address'] as String? ?? '',
       createdAt: json['created_at'] as String? ?? '',
@@ -203,6 +231,8 @@ class OrderDetails {
           : null,
       customerLatitude: double.parse((customer?['latitude'] ?? 18.5204).toString()),
       customerLongitude: double.parse((customer?['longitude'] ?? 73.8567).toString()),
+      deliveryOtp: json['delivery_otp'] as String?,
+      deliveredAt: json['delivered_at'] as String?,
     );
   }
 }

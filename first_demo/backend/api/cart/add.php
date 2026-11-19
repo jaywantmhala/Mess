@@ -63,13 +63,21 @@ try {
         exit;
     }
 
+    $customizations = isset($body['customizations']) ? $body['customizations'] : null;
+    $customizationsJson = null;
+    if (is_array($customizations)) {
+        $customizationsJson = json_encode(array_values($customizations));
+    } else if (is_string($customizations)) {
+        $customizationsJson = $customizations;
+    }
+
     // Upsert: if the cart_item already exists, add quantity; otherwise insert
     $upsertStmt = $pdo->prepare(
-        "INSERT INTO cart_items (customer_id, hotel_id, menu_item_id, quantity)
-         VALUES (?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity)"
+        "INSERT INTO cart_items (customer_id, hotel_id, menu_item_id, quantity, customizations)
+         VALUES (?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE quantity = quantity + VALUES(quantity), customizations = VALUES(customizations)"
     );
-    $upsertStmt->execute([$customerId, $hotelId, $menuItemId, $quantity]);
+    $upsertStmt->execute([$customerId, $hotelId, $menuItemId, $quantity, $customizationsJson]);
 
     // Return full cart summary
     require_once __DIR__ . '/cart_summary.php';

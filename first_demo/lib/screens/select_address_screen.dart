@@ -213,12 +213,13 @@ class _SelectAddressScreenState extends State<SelectAddressScreen> {
     };
   }
 
-  // ── Google Autocomplete ───────────────────────────────────────────────────
+  // ── Google & OpenStreetMap Autocomplete Fallback ───────────────────────────
   Future<void> _searchAddress(String query) async {
     if (query.trim().isEmpty) {
       setState(() => _suggestions = []);
       return;
     }
+    List<Map<String, dynamic>> results = [];
     try {
       final url = Uri.parse(
         'https://maps.googleapis.com/maps/api/place/autocomplete/json'
@@ -226,20 +227,51 @@ class _SelectAddressScreenState extends State<SelectAddressScreen> {
         '&key=$_kGoogleApiKey'
         '&components=country:in',
       );
-      final response = await http.get(url);
+      final response = await http.get(url).timeout(const Duration(seconds: 2));
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         if (data['status'] == 'OK' && data['predictions'] != null) {
-          setState(() {
-            _suggestions = (data['predictions'] as List).map((p) => {
-              'name':         p['structured_formatting']?['main_text']  ?? '',
-              'display_name': p['description'] ?? '',
-              'place_id':     p['place_id'] ?? '',
-            }).toList();
-          });
+          results = (data['predictions'] as List).map((p) => {
+            'name':         p['structured_formatting']?['main_text']  ?? '',
+            'display_name': p['description'] ?? '',
+            'place_id':     p['place_id'] ?? '',
+          }).toList();
         }
       }
     } catch (_) {}
+
+    // Fallback to OpenStreetMap Nominatim search if Google Places returned no predictions or timed out
+    if (results.isEmpty) {
+      try {
+        final nomUrl = Uri.parse(
+          'https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(query)}&countrycodes=in&limit=8',
+        );
+        final nomRes = await http.get(nomUrl, headers: {
+          'User-Agent': 'HungrilyFoodsCustomer/1.0',
+          'Accept-Language': 'en',
+        }).timeout(const Duration(seconds: 3));
+
+        if (nomRes.statusCode == 200) {
+          final nomList = jsonDecode(nomRes.body) as List;
+          results = nomList.map((item) {
+            final displayName = item['display_name'] as String? ?? '';
+            final parts = displayName.split(',');
+            final mainText = parts.isNotEmpty ? parts[0].trim() : displayName;
+            return {
+              'name': mainText,
+              'display_name': displayName,
+              'place_id': 'osm_${item['place_id'] ?? ''}',
+              'lat': double.tryParse(item['lat']?.toString() ?? '') ?? 0.0,
+              'lon': double.tryParse(item['lon']?.toString() ?? '') ?? 0.0,
+            };
+          }).toList();
+        }
+      } catch (_) {}
+    }
+
+    if (mounted) {
+      setState(() => _suggestions = results);
+    }
   }
 
   // ── Place details ─────────────────────────────────────────────────────────
@@ -601,7 +633,26 @@ class _SelectAddressScreenState extends State<SelectAddressScreen> {
                           title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                           subtitle: Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis,
                               style: const TextStyle(fontSize: 12)),
-                          onTap: () => _fetchPlaceDetails(item['place_id'] as String? ?? ''),
+                          onTap: () {
+                            final placeId = item['place_id'] as String? ?? '';
+                            if (placeId.startsWith('osm_')) {
+                              final lat = item['lat'] as double? ?? 0.0;
+                              final lon = item['lon'] as double? ?? 0.0;
+                              if (lat != 0.0 && lon != 0.0) {
+                                final target = LatLng(lat, lon);
+                                setState(() {
+                                  _currentLocation = target;
+                                  _suggestions = [];
+                                  _searchController.clear();
+                                });
+                                FocusScope.of(context).unfocus();
+                                _mapController.move(target, 18.0);
+                                _reverseGeocode(lat, lon);
+                              }
+                            } else {
+                              _fetchPlaceDetails(placeId);
+                            }
+                          },
                         );
                       },
                     ),

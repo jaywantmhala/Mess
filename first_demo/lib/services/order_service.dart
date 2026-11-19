@@ -1,10 +1,9 @@
 // lib/services/order_service.dart
 import 'dart:convert';
 import 'dart:io';
-import 'package:http/http.dart' as http;
 import '../utils/app_config.dart';
 import '../models/order.dart';
-import 'auth_service.dart';
+import '../utils/api_client.dart';
 
 const Duration _kOrderTimeout = Duration(seconds: 20);
 
@@ -12,30 +11,15 @@ class OrderService {
   OrderService._();
   static final OrderService instance = OrderService._();
 
-  Future<Map<String, String>> _authHeaders() async {
-    final token = await AuthService.instance.getSavedToken();
-    return {
-      'Content-Type': 'application/json; charset=utf-8',
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
-  }
-
-  /// Places an order. The backend will:
-  /// 1. Deduct available wallet balance
-  /// 2. Create the order + order_items
-  /// 3. Record the wallet transaction
-  /// 4. Clear the cart
-  /// Returns an [OrderResult] with full payment breakdown.
+  /// Places an order.
   Future<OrderResult> placeOrder({
     required String paymentMethod,
     required String deliveryAddress,
   }) async {
-    final headers = await _authHeaders();
     try {
-      final response = await http
+      final response = await ApiClient.instance
           .post(
             Uri.parse('$kBaseUrl/api/orders/place'),
-            headers: headers,
             body: jsonEncode({
               'payment_method': paymentMethod,
               'delivery_address': deliveryAddress,
@@ -60,13 +44,11 @@ class OrderService {
     int page = 1,
     int limit = 10,
   }) async {
-    final headers = await _authHeaders();
     try {
-      final response = await http
+      final response = await ApiClient.instance
           .get(
             Uri.parse(
                 '$kBaseUrl/api/orders/history?page=$page&limit=$limit'),
-            headers: headers,
           )
           .timeout(_kOrderTimeout);
 
@@ -87,12 +69,10 @@ class OrderService {
 
   /// Returns detailed information for a single order.
   Future<OrderDetails> getDetails({required int orderId}) async {
-    final headers = await _authHeaders();
     try {
-      final response = await http
+      final response = await ApiClient.instance
           .get(
             Uri.parse('$kBaseUrl/api/orders/details?order_id=$orderId'),
-            headers: headers,
           )
           .timeout(_kOrderTimeout);
 

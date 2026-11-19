@@ -12,6 +12,9 @@ class MenuItem {
   final bool isAvailable;
   final String? imageUrl;
   final String menuDate; // YYYY-MM-DD
+  final String mealType; // 'Lunch' or 'Dinner'
+  final List<String> mandatoryItems;
+  final List<String> optionalItems;
 
   MenuItem({
     required this.id,
@@ -25,9 +28,19 @@ class MenuItem {
     required this.isAvailable,
     this.imageUrl,
     required this.menuDate,
+    this.mealType = 'Lunch',
+    this.mandatoryItems = const [],
+    this.optionalItems = const [],
   });
 
   factory MenuItem.fromJson(Map<String, dynamic> json) {
+    List<String> parseList(dynamic val) {
+      if (val is List) {
+        return val.map((e) => e.toString()).where((s) => s.isNotEmpty).toList();
+      }
+      return [];
+    }
+
     return MenuItem(
       id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
       hotelId: json['hotel_id'] is int ? json['hotel_id'] : int.parse(json['hotel_id'].toString()),
@@ -40,6 +53,11 @@ class MenuItem {
       isAvailable: json['is_available'] == true || json['is_available'] == 1 || json['is_available'] == '1' || json['is_available'] == null,
       imageUrl: json['image_url'],
       menuDate: json['menu_date'] ?? '',
+      mealType: (json['meal_type'] != null && json['meal_type'].toString().trim().isNotEmpty)
+          ? json['meal_type'].toString().trim()
+          : 'Lunch',
+      mandatoryItems: parseList(json['mandatory_items']),
+      optionalItems: parseList(json['optional_items']),
     );
   }
 
@@ -56,6 +74,9 @@ class MenuItem {
       'is_available': isAvailable ? 1 : 0,
       'image_url': imageUrl,
       'menu_date': menuDate,
+      'meal_type': mealType,
+      'mandatory_items': mandatoryItems,
+      'optional_items': optionalItems,
     };
   }
 }

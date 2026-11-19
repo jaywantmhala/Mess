@@ -2,7 +2,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/order.dart';
-import 'websocket_service.dart';
+import 'ably_service.dart';
 
 class ActiveOrderService {
   ActiveOrderService._() {
@@ -31,14 +31,14 @@ class ActiveOrderService {
   }
 
   void _startWSListener() {
-    _wsSubscription = WebSocketService.instance.messages.listen((msg) {
+    _wsSubscription = AblyService.instance.messages.listen((msg) {
       final event = msg['event'] as String?;
       final eventData = msg['data'];
       if (eventData == null || activeOrderNotifier.value == null) return;
 
       if (event == 'ORDER_STATUS_UPDATED') {
         try {
-          final orderId = eventData['order_id'] as int?;
+          final orderId = int.tryParse(eventData['order_id']?.toString() ?? '');
           final status = eventData['status'] as String?;
           final currentActive = activeOrderNotifier.value;
 

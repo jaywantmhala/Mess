@@ -35,22 +35,27 @@ try {
             o.order_id,
             h.hotel_name  AS hotel_name,
             o.status,
+            COALESCE(o.meal_type, 'Lunch') AS meal_type,
             o.grand_total,
             o.wallet_deducted,
+            o.tiffin_charge,
             o.created_at,
             o.tiffin_received_to_hotel,
             COUNT(oi.order_item_id) AS item_count
          FROM orders o
          JOIN hotels      h  ON h.id  = o.hotel_id
          LEFT JOIN order_items oi ON oi.order_id = o.order_id
-         WHERE o.customer_id = ?
+         WHERE o.customer_id = :customer_id
          GROUP BY
-            o.order_id, h.hotel_name, o.status,
-            o.grand_total, o.wallet_deducted, o.created_at, o.tiffin_received_to_hotel
+            o.order_id, h.hotel_name, o.status, o.meal_type,
+            o.grand_total, o.wallet_deducted, o.tiffin_charge, o.created_at, o.tiffin_received_to_hotel
          ORDER BY o.created_at DESC
-         LIMIT ? OFFSET ?"
+         LIMIT :limit OFFSET :offset"
     );
-    $stmt->execute([$customerId, $limit, $offset]);
+    $stmt->bindValue(':customer_id', $customerId, PDO::PARAM_INT);
+    $stmt->bindValue(':limit',       $limit,      PDO::PARAM_INT);
+    $stmt->bindValue(':offset',      $offset,     PDO::PARAM_INT);
+    $stmt->execute();
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $orders = array_map(function ($row) {
@@ -58,8 +63,10 @@ try {
             'order_id'                  => (int)    $row['order_id'],
             'hotel_name'                =>          $row['hotel_name'],
             'status'                    =>          $row['status'],
+            'meal_type'                 =>          $row['meal_type'] ?? 'Lunch',
             'grand_total'               => number_format((float) $row['grand_total'],     2, '.', ''),
             'wallet_deducted'           => number_format((float) $row['wallet_deducted'], 2, '.', ''),
+            'tiffin_charge'             => number_format((float) ($row['tiffin_charge'] ?? 50.00), 2, '.', ''),
             'item_count'                => (int)    $row['item_count'],
             'created_at'                =>          $row['created_at'],
             'tiffin_received_to_hotel'  =>          $row['tiffin_received_to_hotel'],

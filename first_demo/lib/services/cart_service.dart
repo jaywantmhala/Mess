@@ -18,7 +18,7 @@ class HotelConflictException implements Exception {
 
   @override
   String toString() =>
-      'Your cart has items from "$existingHotelName". Clear cart to add from new hotel.';
+      'Your cart has items from "$existingHotelName". Clear cart to add from new mess.';
 }
 
 class CartService {
@@ -70,6 +70,7 @@ class CartService {
     required int menuItemId,
     required int hotelId,
     int quantity = 1,
+    List<String>? selectedOptionals,
   }) async {
     final headers = await _authHeaders();
     try {
@@ -81,6 +82,7 @@ class CartService {
               'menu_item_id': menuItemId,
               'hotel_id': hotelId,
               'quantity': quantity,
+              if (selectedOptionals != null) 'customizations': selectedOptionals,
             }),
           )
           .timeout(_kCartTimeout);
@@ -90,7 +92,7 @@ class CartService {
       // Hotel conflict
       if (body['hotel_conflict'] == true) {
         throw HotelConflictException(
-          existingHotelName: body['existing_hotel_name'] as String? ?? 'another hotel',
+          existingHotelName: body['existing_hotel_name'] as String? ?? 'another mess',
           existingHotelId: int.parse((body['existing_hotel_id'] ?? 0).toString()),
         );
       }

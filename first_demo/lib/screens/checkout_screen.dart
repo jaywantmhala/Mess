@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:audioplayers/audioplayers.dart';
 import '../models/cart.dart';
 import '../models/order.dart';
 import '../models/wallet.dart';
@@ -8,6 +7,11 @@ import '../services/wallet_service.dart';
 import '../services/order_service.dart';
 import '../services/address_service.dart';
 import '../services/active_order_service.dart';
+import '../services/payment_service.dart';
+import '../services/payu_service.dart';
+import '../models/address_data.dart';
+import 'saved_addresses_screen.dart';
+import 'order_success_screen.dart';
 
 class CheckoutScreen extends StatefulWidget {
   final CartSummary cart;
@@ -42,8 +46,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   @override
   void initState() {
     super.initState();
+    PaymentService.instance.init();
     _fetchWallet();
     _loadAddress();
+  }
+
+  @override
+  void dispose() {
+    PaymentService.instance.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchWallet() async {
@@ -59,7 +70,16 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     try {
       final addr = await AddressService.instance.getAddress();
       if (mounted && addr != null) {
-        setState(() => _deliveryAddress = addr.fullAddress);
+        final tagEmoji = (addr.tag == 'OFFICE' || addr.tag == 'WORK') ? '🏢' : ((addr.tag == 'HOME') ? '🏠' : '📍');
+        final tagText = addr.tag[0].toUpperCase() + addr.tag.substring(1).toLowerCase();
+        final parts = <String>[];
+        if (addr.houseNo.isNotEmpty) parts.add(addr.houseNo);
+        if (addr.fullAddress.isNotEmpty) parts.add(addr.fullAddress);
+        if (addr.landmark.isNotEmpty) parts.add('Landmark: ${addr.landmark}');
+
+        setState(() {
+          _deliveryAddress = '$tagEmoji $tagText: ${parts.join(', ')}';
+        });
       } else if (mounted) {
         setState(() => _deliveryAddress = 'No address saved');
       }
@@ -68,14 +88,40 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     }
   }
 
+  Future<void> _onChangeAddress() async {
+    final selected = await Navigator.push<AddressData>(
+      context,
+      MaterialPageRoute(builder: (_) => const SavedAddressesScreen()),
+    );
+    if (selected != null) {
+      final tagEmoji = (selected.tag == 'OFFICE' || selected.tag == 'WORK') ? '🏢' : ((selected.tag == 'HOME') ? '🏠' : '📍');
+      final tagText = selected.tag[0].toUpperCase() + selected.tag.substring(1).toLowerCase();
+      final parts = <String>[];
+      if (selected.houseNo.isNotEmpty) parts.add(selected.houseNo);
+      if (selected.fullAddress.isNotEmpty) parts.add(selected.fullAddress);
+      if (selected.landmark.isNotEmpty) parts.add('Landmark: ${selected.landmark}');
+
+      setState(() {
+        _deliveryAddress = '$tagEmoji $tagText: ${parts.join(', ')}';
+      });
+    } else {
+      _loadAddress();
+    }
+  }
+
   // ── Math helpers ─────────────────────────────────────────────────────────────
 
   double get _walletBalance => _wallet?.balance ?? 0;
-  double get _grandTotal => widget.cart.grandTotal;
+
+  double get _tiffinCharge => widget.cart.tiffinCharge > 0 ? widget.cart.tiffinCharge : 50.0;
+
+  double get _grandTotal => widget.cart.grandTotal > 0
+      ? widget.cart.grandTotal
+      : (widget.cart.subtotal + _tiffinCharge + widget.cart.deliveryFee + widget.cart.taxAmount);
 
   double get _walletDeduction {
     if (_walletBalance <= 0) return 0;
-    return _walletBalance >= _grandTotal ? _grandTotal : _walletBalance;
+    return _walletBalance >= _tiffinCharge ? _tiffinCharge : _walletBalance;
   }
 
   double get _remainingPayable => (_grandTotal - _walletDeduction).clamp(0, double.infinity);
@@ -85,6 +131,82 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   // ── Place order ──────────────────────────────────────────────────────────────
 
   Future<void> _placeOrder() async {
+    if (_walletBalance < _tiffinCharge) {
+      final areaSuffix = (widget.cart.areaName != null && widget.cart.areaName!.isNotEmpty) ? " (${widget.cart.areaName} Tiffin Charge)" : "";
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Insufficient wallet balance. Minimum ₹${_tiffinCharge.toStringAsFixed(0)}$areaSuffix required in wallet to place an order."),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
+      return;
+    }
+
+    if (_selectedPayment == 'UPI' && !_fullyPaidByWallet && _remainingPayable > 0) {
+      await _startPayUUpiPayment();
+    } else {
+      await _executeOrderPlacement();
+    }
+  }
+
+  Future<void> _startPayUUpiPayment() async {
+    setState(() => _isPlacingOrder = true);
+    try {
+      final orderResult = await PayUService.instance.createOrder(1);
+      final options = PayUService.instance.buildCheckoutOptions(
+        orderId: orderResult.orderId ?? 'order_ord_${DateTime.now().millisecondsSinceEpoch}',
+        keyId: orderResult.keyId ?? PayUService.payuMerchantKey,
+        amountPaise: (_remainingPayable * 100).toInt(),
+        planName: 'Food Delivery Order',
+        customerName: orderResult.customerName,
+        customerEmail: orderResult.customerEmail,
+        customerPhone: orderResult.customerPhone,
+        hash: orderResult.hash,
+        action: orderResult.action,
+        surl: orderResult.surl,
+        furl: orderResult.furl,
+        udf1: orderResult.udf1,
+        udf2: orderResult.udf2,
+      );
+
+      await PaymentService.instance.openCheckout(
+        options: options,
+        onSuccess: (verifyResult) {
+          if (mounted) {
+            setState(() => _isPlacingOrder = false);
+            _executeOrderPlacement();
+          }
+        },
+        onError: (errorMsg) {
+          if (!mounted) return;
+          setState(() => _isPlacingOrder = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMsg.contains('cancelled') ? 'Payment cancelled.' : 'Payment failed: $errorMsg'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        },
+        onCancelled: () {
+          if (!mounted) return;
+          setState(() => _isPlacingOrder = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Payment cancelled.'), backgroundColor: Colors.red),
+          );
+        },
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isPlacingOrder = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error initiating PayU payment: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _executeOrderPlacement() async {
     setState(() => _isPlacingOrder = true);
     try {
       final result = await OrderService.instance.placeOrder(
@@ -98,7 +220,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         // Track the order globally in ActiveOrderService
         final orderItem = OrderHistoryItem(
           orderId: result.orderId,
-          hotelName: widget.cart.hotel?.name ?? 'Hotel',
+          hotelName: widget.cart.hotel?.name ?? 'Mess',
           status: result.status,
           grandTotal: result.grandTotal,
           walletDeducted: result.walletDeducted,
@@ -117,8 +239,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             content: Text(e.toString()),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
         );
       }
@@ -126,164 +247,15 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   }
 
   Future<void> _showSuccessDialog(OrderResult result) async {
-    // 1. Play success chime sound!
-    final audioPlayer = AudioPlayer();
-    try {
-      await audioPlayer.setAudioContext(AudioContext(
-        android: const AudioContextAndroid(
-          isSpeakerphoneOn: true,
-          stayAwake: true,
-          contentType: AndroidContentType.music,
-          usageType: AndroidUsageType.media,
-          audioFocus: AndroidAudioFocus.gainTransient,
-        ),
-        iOS: AudioContextIOS(
-          category: AVAudioSessionCategory.playback,
-          options: {
-            AVAudioSessionOptions.mixWithOthers,
-          },
-        ),
-      ));
-      await audioPlayer.setVolume(1.0);
-      await audioPlayer.play(AssetSource('sounds/success.mp3'));
-    } catch (e) {
-      debugPrint('Failed to play success sound: $e');
-    }
-
-    // 2. Set up auto redirect timer
-    bool redirected = false;
-    final timer = Timer(const Duration(seconds: 3), () {
-      if (mounted && !redirected) {
-        redirected = true;
-        // Close dialog
-        Navigator.of(context, rootNavigator: true).pop();
-        // Pop CheckoutScreen
-        Navigator.pop(context);
-        // Navigate to Order Status Screen
-        widget.onOrderPlaced?.call();
-      }
-    });
-
-    // 3. Show dialog and await user interaction (if they tap early)
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => Dialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        child: Padding(
-          padding: const EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: _green.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.check_circle_rounded,
-                    color: _green, size: 44),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                'Congratulations! 🥳',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: _textDark,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Your order has been placed successfully!',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w600,
-                  color: _green,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'Order #${result.orderId}',
-                style: const TextStyle(fontSize: 13, color: _textGrey),
-              ),
-              const SizedBox(height: 20),
-              _receiptRow('Order Total',
-                  '₹${result.grandTotal.toStringAsFixed(2)}'),
-              if (result.walletDeducted > 0) ...[
-                const SizedBox(height: 8),
-                _receiptRow(
-                  'Wallet Paid',
-                  '- ₹${result.walletDeducted.toStringAsFixed(2)}',
-                  valueColor: _green,
-                ),
-              ],
-              if (result.remainingPayable > 0) ...[
-                const SizedBox(height: 8),
-                _receiptRow(
-                  'To Pay (${_selectedPayment})',
-                  '₹${result.remainingPayable.toStringAsFixed(2)}',
-                  valueColor: _coral,
-                ),
-              ],
-              const SizedBox(height: 8),
-              _receiptRow(
-                'New Wallet Balance',
-                '₹${result.newWalletBalance.toStringAsFixed(2)}',
-                valueColor: _textDark,
-                bold: true,
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _green,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                  onPressed: () {
-                    if (!redirected) {
-                      redirected = true;
-                      timer.cancel();
-                      Navigator.pop(ctx);
-                      Navigator.pop(context);
-                      widget.onOrderPlaced?.call();
-                    }
-                  },
-                  child: const Text('Track Order',
-                      style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white)),
-                ),
-              ),
-            ],
-          ),
+    if (!mounted) return;
+    widget.onOrderPlaced?.call();
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => OrderSuccessScreen(
+          orderId: result.orderId,
+          addressDetails: _deliveryAddress,
         ),
       ),
-    );
-  }
-
-  Widget _receiptRow(String label, String value,
-      {Color? valueColor, bool bold = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label,
-            style: const TextStyle(fontSize: 13, color: _textGrey)),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
-            color: valueColor ?? _textDark,
-          ),
-        ),
-      ],
     );
   }
 
@@ -336,39 +308,61 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildDeliveryAddress() {
     return _card(
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(9),
-            decoration: BoxDecoration(
-              color: _coral.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.location_on_rounded,
-                color: _coral, size: 20),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Delivery Address',
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _coral.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.location_on_rounded, color: _coral, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'Delivery Address',
                     style: TextStyle(
-                        fontSize: 12,
-                        color: _textGrey,
-                        fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Text(
-                  _deliveryAddress,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: _textDark,
-                    height: 1.4,
+                      fontSize: 13,
+                      color: _textGrey,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+              GestureDetector(
+                onTap: _onChangeAddress,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: _coral.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'Change',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: _coral,
+                    ),
                   ),
                 ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            _deliveryAddress,
+            style: const TextStyle(
+              fontSize: 13.5,
+              fontWeight: FontWeight.w700,
+              color: _textDark,
+              height: 1.4,
             ),
           ),
         ],
@@ -458,11 +452,111 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           _summaryRow('Item Total',
               '₹${widget.cart.subtotal.toStringAsFixed(2)}'),
           const SizedBox(height: 8),
-          _summaryRow('Delivery Fee',
-              '₹${widget.cart.deliveryFee.toStringAsFixed(2)}'),
+          _summaryRow(
+            'Tiffin Charge',
+            '₹${_tiffinCharge.toStringAsFixed(2)}',
+            badge: (widget.cart.hasDiscount || (widget.cart.areaName != null && widget.cart.areaName!.isNotEmpty))
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (widget.cart.areaName != null && widget.cart.areaName!.isNotEmpty)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            widget.cart.areaName!,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF2563EB),
+                            ),
+                          ),
+                        ),
+                      if (widget.cart.hasDiscount) ...[
+                        if (widget.cart.areaName != null && widget.cart.areaName!.isNotEmpty)
+                          const SizedBox(width: 4),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDCFCE7),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: const Color(0xFF86EFAC)),
+                          ),
+                          child: Text(
+                            '${widget.cart.discountPercentage.toStringAsFixed(0)}% OFF',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF15803D),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  )
+                : null,
+            customValue: widget.cart.hasDiscount
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '₹${widget.cart.originalTiffinCharge.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 12.5,
+                          color: Colors.grey,
+                          decoration: TextDecoration.lineThrough,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '₹${_tiffinCharge.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          color: _green,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  )
+                : null,
+          ),
           const SizedBox(height: 8),
           _summaryRow(
-              'Taxes', '₹${widget.cart.taxAmount.toStringAsFixed(2)}'),
+            'Delivery Charge',
+            widget.cart.deliveryFee <= 0 ? 'FREE' : '₹${widget.cart.deliveryFee.toStringAsFixed(2)}',
+            customValue: widget.cart.deliveryFee <= 0
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Text(
+                        '₹40.00',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey,
+                          decoration: TextDecoration.lineThrough,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      SizedBox(width: 6),
+                      Text(
+                        'FREE',
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          color: _green,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  )
+                : null,
+          ),
+          const SizedBox(height: 8),
+          _summaryRow(
+              'Taxes & Fees', '₹${widget.cart.taxAmount.toStringAsFixed(2)}'),
           const Padding(
               padding: EdgeInsets.symmetric(vertical: 10),
               child: Divider(height: 1)),
@@ -485,7 +579,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               const Icon(Icons.account_balance_wallet_rounded,
                   color: _coral, size: 20),
               const SizedBox(width: 10),
-              const Text('ZenQube Wallet',
+              const Text("Hungrily Food's Wallet",
                   style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w800,
@@ -532,11 +626,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   Expanded(
                     child: Text(
                       _walletDeduction > 0
-                          ? '₹${_walletDeduction.toStringAsFixed(2)} will be deducted from wallet'
-                          : 'Wallet balance is ₹0. No wallet deduction.',
+                          ? '₹${_walletDeduction.toStringAsFixed(2)} ${widget.cart.areaName != null && widget.cart.areaName!.isNotEmpty ? "(${widget.cart.areaName}) " : ""}tiffin charge will be deducted from wallet'
+                          : (_walletBalance < _tiffinCharge
+                              ? 'Wallet balance is ₹${_walletBalance.toStringAsFixed(2)}. Need at least ₹${_tiffinCharge.toStringAsFixed(2)} for tiffin charge.'
+                              : 'No wallet deduction.'),
                       style: TextStyle(
                         fontSize: 13,
-                        color: _walletDeduction > 0 ? _green : _textGrey,
+                        color: _walletDeduction > 0 ? _green : (_walletBalance < _tiffinCharge ? Colors.orange.shade800 : _textGrey),
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -559,7 +655,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         color: _amber, size: 18),
                     const SizedBox(width: 10),
                     Text(
-                      'Remaining ₹${_remainingPayable.toStringAsFixed(2)} via ${_selectedPayment}',
+                      'Remaining ₹${_remainingPayable.toStringAsFixed(2)} via $_selectedPayment',
                       style: const TextStyle(
                         fontSize: 13,
                         color: _amber,
@@ -647,7 +743,9 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           if (_walletDeduction > 0) ...[
             const SizedBox(height: 8),
             _darkRow(
-              'Wallet Deduction',
+              widget.cart.areaName != null && widget.cart.areaName!.isNotEmpty
+                  ? 'Wallet Deduction (${widget.cart.areaName} Tiffin)'
+                  : 'Wallet Deduction (Tiffin Charge)',
               '- ₹${_walletDeduction.toStringAsFixed(2)}',
               valueColor: _green,
             ),
@@ -788,18 +886,30 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     );
   }
 
-  Widget _summaryRow(String label, String value, {bool bold = false}) {
+  Widget _summaryRow(String label, String value, {bool bold = false, Widget? customValue, Widget? badge}) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label,
-            style: const TextStyle(fontSize: 13.5, color: _textGrey)),
-        Text(value,
-            style: TextStyle(
-              fontSize: 13.5,
-              fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
-              color: _textDark,
-            )),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label,
+                style: const TextStyle(fontSize: 13.5, color: _textGrey)),
+            if (badge != null) ...[
+              const SizedBox(width: 6),
+              badge,
+            ],
+          ],
+        ),
+        if (customValue != null)
+          customValue
+        else
+          Text(value,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: bold ? FontWeight.w800 : FontWeight.w600,
+                color: _textDark,
+              )),
       ],
     );
   }

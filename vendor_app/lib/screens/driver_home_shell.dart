@@ -8,15 +8,19 @@ import 'driver_orders_tab.dart';
 import 'driver_profile_tab.dart';
 import '../services/websocket_service.dart';
 import '../services/driver_order_service.dart';
+import '../services/driver_auth_service.dart';
+import '../services/fcm_service.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
 class DriverHomeShell extends StatefulWidget {
   const DriverHomeShell({super.key});
 
   @override
-  State<DriverHomeShell> createState() => _DriverHomeShellState();
+  @override
+  State<DriverHomeShell> createState() => DriverHomeShellState();
 }
 
-class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderStateMixin {
+class DriverHomeShellState extends State<DriverHomeShell> with TickerProviderStateMixin {
   int _currentIndex = 0;
   late PageController _pageController;
   late List<Widget> _tabs;
@@ -71,10 +75,22 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
 
     // Connect WebSocket and listen for notifications
     WebSocketService.instance.connect(role: 'driver');
+    FcmService.instance.registerToken('driver');
     _startWSListener();
+    _subscribeDriverChannelOnLoad();
   }
 
-  bool _isShowingTiffinDialog = false;
+  Future<void> _subscribeDriverChannelOnLoad() async {
+    try {
+      final driver = await DriverAuthService.instance.getSavedDriver();
+      if (driver != null && driver.id > 0) {
+        debugPrint('DriverHomeShell: Subscribing to driver channel driver_${driver.id}');
+        await WebSocketService.instance.subscribeToDriver(driver.id);
+      }
+    } catch (e) {
+      debugPrint('DriverHomeShell: Error subscribing to driver channel on load: $e');
+    }
+  }
 
   void _startWSListener() {
     _wsSubscription = WebSocketService.instance.messages.listen((msg) {
@@ -83,24 +99,16 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
         final eventData = msg['data'];
         
         debugPrint('DriverHomeShell: Received WebSocket event: $event');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Received WebSocket Event: $event'),
-              backgroundColor: Colors.blueGrey,
-              duration: const Duration(seconds: 3),
-            ),
-          );
-        }
 
         if (eventData == null) return;
 
-        if (event == 'ORDER_ASSIGNED') {
+        if (event == 'ORDER_ASSIGNED' || event == 'order_assigned') {
           _showAssignmentNotification(eventData);
-        } else if (event == 'PENDING_TIFFIN_RETURN') {
-          _showTiffinReturnPopup(eventData);
-        } else if (event == 'TIFFIN_RETURN_CONFIRMED') {
-          _dismissTiffinReturnPopup();
+        } else if (event == 'tiffin-return-required' || event == 'PENDING_TIFFIN_RETURN') {
+          showTiffinReturnPopup(eventData);
+        } else if (event == 'TIFFIN_RETURN_CONFIRMED' || event == 'tiffin-return-completed') {
+          final hotelName = eventData is Map ? (eventData['hotel_name']?.toString() ?? 'Restaurant') : 'Restaurant';
+          _dismissTiffinReturnPopup(hotelName: hotelName);
         }
       } catch (e, stack) {
         debugPrint('DriverHomeShell WS Listener Error: $e\n$stack');
@@ -117,7 +125,7 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
     });
   }
 
-  void _showTiffinReturnPopup(dynamic data) {
+  void showTiffinReturnPopup(dynamic data) {
     debugPrint('DriverHomeShell: _showTiffinReturnPopup called with: $data');
     try {
       if (!mounted) {
@@ -125,7 +133,7 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
         return;
       }
       
-      final previousOrderId = data['previous_order_id'] ?? 0;
+      final previousOrderId = data['pending_tiffin_order_id'] ?? data['previous_order_id'] ?? data['order_id'] ?? 0;
       final hotelName = data['hotel_name']?.toString() ?? 'Restaurant';
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -143,7 +151,11 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
         _tiffinOverlay = OverlayEntry(
           builder: (context) {
             bool isVerifying = false;
+            bool isVerified = false;
+            bool showScanner = false;
+            bool showManualInput = false;
             String? errorMessage;
+            String? successMessage;
 
             return Positioned.fill(
               child: StatefulBuilder(
@@ -159,8 +171,9 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
                       ),
                       // Centered Popup Card
                       Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                        child: SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 32.0),
                           child: Material(
                             color: Colors.transparent,
                             child: Container(
@@ -172,7 +185,7 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
                                   width: 1,
                                 ),
                               ),
-                              padding: const EdgeInsets.all(24.0),
+                              padding: const EdgeInsets.all(20.0),
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -189,8 +202,33 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
                                     ),
                                   ),
                                   const SizedBox(height: 18),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.success.withOpacity(0.2),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: AppColors.success.withOpacity(0.5)),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.check_circle_rounded, color: AppColors.success, size: 16),
+                                        SizedBox(width: 6),
+                                        Text(
+                                          'Delivery Successful ✓',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.success,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
                                   const Text(
-                                    'Collect Tiffin Box',
+                                    'Previous Tiffin Return Required',
+                                    textAlign: TextAlign.center,
                                     style: TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.w900,
@@ -199,11 +237,11 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
                                   ),
                                   const SizedBox(height: 8),
                                   Text(
-                                    'Collect the pending tiffin box from the customer and enter the 4-digit OTP displayed on their screen.',
+                                    'Please verify the empty tiffin container from $hotelName before continuing.',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
                                       fontSize: 13,
-                                      color: Colors.white.withOpacity(0.6),
+                                      color: Colors.white.withOpacity(0.7),
                                     ),
                                   ),
                                   const SizedBox(height: 20),
@@ -224,7 +262,7 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
                                             Text(
-                                              'Hotel:',
+                                              'Mess:',
                                               style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
                                             ),
                                             Text(
@@ -250,106 +288,354 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(height: 24),
+                                  const SizedBox(height: 20),
 
-                                  // OTP TextField
-                                  TextField(
-                                    controller: _tiffinOtpController,
-                                    keyboardType: TextInputType.number,
-                                    maxLength: 4,
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 8,
-                                    ),
-                                    decoration: InputDecoration(
-                                      hintText: '0000',
-                                      hintStyle: TextStyle(
-                                        color: Colors.white.withOpacity(0.2),
-                                        letterSpacing: 8,
-                                      ),
-                                      counterText: '',
-                                      filled: true,
-                                      fillColor: Colors.white.withOpacity(0.04),
-                                      contentPadding: const EdgeInsets.symmetric(vertical: 16),
-                                      enabledBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                        borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
-                                      ),
-                                      focusedBorder: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                        borderSide: const BorderSide(color: AppColors.primary, width: 2),
-                                      ),
-                                    ),
-                                  ),
                                   if (errorMessage != null) ...[
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      errorMessage!,
-                                      style: const TextStyle(color: AppColors.error, fontSize: 12, fontWeight: FontWeight.bold),
+                                    Container(
+                                      padding: const EdgeInsets.all(12),
+                                      margin: const EdgeInsets.only(bottom: 16),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.error.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(12),
+                                        border: Border.all(color: AppColors.error.withOpacity(0.4)),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 20),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Text(
+                                              errorMessage!,
+                                              style: const TextStyle(color: AppColors.error, fontSize: 12, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
                                   ],
-                                  const SizedBox(height: 24),
 
-                                  // Verify Button
-                                  SizedBox(
-                                    width: double.infinity,
-                                    child: ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppColors.primary,
-                                        foregroundColor: Colors.white,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(16),
-                                        ),
-                                        padding: const EdgeInsets.symmetric(vertical: 14),
+                                  if (isVerified) ...[
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(16),
+                                      margin: const EdgeInsets.only(bottom: 20),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.success.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(color: AppColors.success.withOpacity(0.4)),
                                       ),
-                                      onPressed: isVerifying
-                                          ? null
-                                          : () async {
-                                              final enteredOtp = _tiffinOtpController.text.trim();
-                                              if (enteredOtp.length < 4) {
-                                                setState(() {
-                                                  errorMessage = 'Please enter a 4-digit OTP.';
-                                                });
-                                                return;
-                                              }
-
-                                              setState(() {
-                                                isVerifying = true;
-                                                errorMessage = null;
-                                              });
-
-                                              final res = await DriverOrderService.instance.verifyTiffinOtp(
-                                                orderId: previousOrderId,
-                                                otp: enteredOtp,
-                                              );
-
-                                              if (res['success'] == true) {
-                                                _dismissTiffinReturnPopup();
-                                              } else {
-                                                setState(() {
-                                                  isVerifying = false;
-                                                  errorMessage = res['message'] ?? 'Verification failed. Try again.';
-                                                });
-                                              }
-                                            },
-                                      child: isVerifying
-                                          ? const SizedBox(
-                                              width: 20,
-                                              height: 20,
-                                              child: CircularProgressIndicator(
-                                                color: Colors.white,
-                                                strokeWidth: 2,
-                                              ),
-                                            )
-                                          : const Text(
-                                              'Verify OTP',
-                                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                      child: Column(
+                                        children: [
+                                          const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 56),
+                                          const SizedBox(height: 12),
+                                          const Text(
+                                            'Tiffin Verified Successfully!',
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 16,
                                             ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Text(
+                                            successMessage ?? '$hotelName Tiffin Verified',
+                                            textAlign: TextAlign.center,
+                                            style: TextStyle(
+                                              color: AppColors.success.withOpacity(0.9),
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppColors.success,
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(vertical: 16),
+                                        ),
+                                        icon: const Icon(Icons.check_rounded, size: 22),
+                                        label: const Text(
+                                          'Submit / Confirm Return',
+                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                        ),
+                                        onPressed: () {
+                                          _dismissTiffinReturnPopup(hotelName: hotelName);
+                                        },
+                                      ),
+                                    ),
+                                  ] else if (showScanner) ...[
+                                    // Live Inline Camera Scanner below details card
+                                    Container(
+                                      height: 220,
+                                      width: double.infinity,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(
+                                          color: isVerifying
+                                              ? Colors.orange
+                                              : (errorMessage != null ? AppColors.error : AppColors.primary),
+                                          width: 2.5,
+                                        ),
+                                      ),
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(18),
+                                        child: Stack(
+                                          children: [
+                                            MobileScanner(
+                                              onDetect: (capture) async {
+                                                if (isVerifying || isVerified) return;
+                                                final barcodes = capture.barcodes;
+                                                if (barcodes.isEmpty) return;
+                                                final rawValue = barcodes.first.rawValue;
+                                                if (rawValue == null || rawValue.trim().isEmpty) return;
+
+                                                final code = rawValue.trim();
+
+                                                setState(() {
+                                                  isVerifying = true;
+                                                  errorMessage = null;
+                                                });
+
+                                                try {
+                                                  final res = await DriverOrderService.instance.verifyTiffinOtp(
+                                                    orderId: previousOrderId,
+                                                    otp: code,
+                                                  );
+
+                                                  if (res['success'] == true) {
+                                                    setState(() {
+                                                      isVerifying = false;
+                                                      isVerified = true;
+                                                      showScanner = false;
+                                                      showManualInput = false;
+                                                      successMessage = res['message'] ?? '$hotelName Tiffin Returned Successfully ✓';
+                                                    });
+                                                  } else {
+                                                    setState(() {
+                                                      isVerifying = false;
+                                                      errorMessage = res['message'] ?? 'This QR code is invalid.';
+                                                    });
+                                                  }
+                                                } catch (e) {
+                                                  setState(() {
+                                                    isVerifying = false;
+                                                    errorMessage = 'This QR code is invalid.';
+                                                  });
+                                                }
+                                              },
+                                            ),
+                                            if (isVerifying)
+                                              Container(
+                                                color: Colors.black.withOpacity(0.65),
+                                                child: const Center(
+                                                  child: Column(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+                                                      SizedBox(height: 10),
+                                                      Text(
+                                                        'Verifying Barcode...',
+                                                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(
+                                      'Point camera at the QR code on $hotelName tiffin box',
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 12, fontWeight: FontWeight.w600),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    TextButton.icon(
+                                      icon: const Icon(Icons.arrow_back_rounded, color: Colors.white70, size: 16),
+                                      label: const Text('Back to Options', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                                      onPressed: () {
+                                        setState(() {
+                                          showScanner = false;
+                                          errorMessage = null;
+                                        });
+                                      },
+                                    ),
+                                  ] else if (showManualInput) ...[
+                                    // Manual Entry Section
+                                    TextField(
+                                      controller: _tiffinOtpController,
+                                      keyboardType: TextInputType.text,
+                                      textCapitalization: TextCapitalization.characters,
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 4,
+                                      ),
+                                      decoration: InputDecoration(
+                                        hintText: 'Enter Barcode or OTP',
+                                        hintStyle: TextStyle(
+                                          color: Colors.white.withOpacity(0.3),
+                                          letterSpacing: 2,
+                                          fontSize: 15,
+                                        ),
+                                        counterText: '',
+                                        filled: true,
+                                        fillColor: Colors.white.withOpacity(0.04),
+                                        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                                        enabledBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(16),
+                                          borderSide: BorderSide(color: Colors.white.withOpacity(0.12)),
+                                        ),
+                                        focusedBorder: OutlineInputBorder(
+                                          borderRadius: BorderRadius.circular(16),
+                                          borderSide: const BorderSide(color: AppColors.primary, width: 2),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppColors.primary,
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(vertical: 14),
+                                        ),
+                                        onPressed: isVerifying
+                                            ? null
+                                            : () async {
+                                                final enteredOtp = _tiffinOtpController.text.trim();
+                                                if (enteredOtp.isEmpty) {
+                                                  setState(() {
+                                                    errorMessage = 'Please enter Barcode or OTP.';
+                                                  });
+                                                  return;
+                                                }
+
+                                                setState(() {
+                                                  isVerifying = true;
+                                                  errorMessage = null;
+                                                });
+
+                                                final res = await DriverOrderService.instance.verifyTiffinOtp(
+                                                  orderId: previousOrderId,
+                                                  otp: enteredOtp,
+                                                );
+
+                                                if (res['success'] == true) {
+                                                  setState(() {
+                                                    isVerifying = false;
+                                                    isVerified = true;
+                                                    showScanner = false;
+                                                    showManualInput = false;
+                                                    successMessage = res['message'] ?? '$hotelName Tiffin Returned Successfully ✓';
+                                                  });
+                                                } else {
+                                                  setState(() {
+                                                    isVerifying = false;
+                                                    errorMessage = res['message'] ?? 'This QR code is invalid.';
+                                                  });
+                                                }
+                                              },
+                                        child: isVerifying
+                                            ? const SizedBox(
+                                                width: 20,
+                                                height: 20,
+                                                child: CircularProgressIndicator(
+                                                  color: Colors.white,
+                                                  strokeWidth: 2,
+                                                ),
+                                              )
+                                            : const Text(
+                                                'Verify Barcode',
+                                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                              ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    TextButton.icon(
+                                      icon: const Icon(Icons.arrow_back_rounded, color: Colors.white70, size: 16),
+                                      label: const Text(
+                                        'Back to Options',
+                                        style: TextStyle(color: Colors.white70, fontSize: 13),
+                                      ),
+                                      onPressed: () {
+                                        setState(() {
+                                          showManualInput = false;
+                                          errorMessage = null;
+                                        });
+                                      },
+                                    ),
+                                  ] else ...[
+                                    // 1. Scan QR Code Button (Primary Option)
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton.icon(
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: AppColors.primary,
+                                          foregroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(vertical: 16),
+                                        ),
+                                        icon: const Icon(Icons.qr_code_scanner_rounded, size: 22),
+                                        label: const Text(
+                                          'Scan QR Code',
+                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                        ),
+                                        onPressed: () {
+                                          setState(() {
+                                            showScanner = true;
+                                            showManualInput = false;
+                                            errorMessage = null;
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+
+                                    // 2. Enter Barcode Manually Button (Secondary Option)
+                                    SizedBox(
+                                      width: double.infinity,
+                                      child: OutlinedButton.icon(
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.white,
+                                          side: BorderSide(color: Colors.white.withOpacity(0.2)),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(vertical: 14),
+                                        ),
+                                        icon: const Icon(Icons.keyboard_rounded, size: 20),
+                                        label: const Text(
+                                          'Enter Barcode Manually',
+                                          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                        ),
+                                        onPressed: () {
+                                          setState(() {
+                                            showManualInput = true;
+                                            showScanner = false;
+                                            errorMessage = null;
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -391,23 +677,28 @@ class _DriverHomeShellState extends State<DriverHomeShell> with TickerProviderSt
     }
   }
 
-  void _dismissTiffinReturnPopup() {
+  void _dismissTiffinReturnPopup({String hotelName = 'Restaurant'}) {
     if (_tiffinOverlay != null) {
       _tiffinOverlay?.remove();
       _tiffinOverlay = null;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              Icon(Icons.check_circle_rounded, color: Colors.white),
-              SizedBox(width: 8),
-              Text('Tiffin return verified successfully!'),
-            ],
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('$hotelName Tiffin Returned Successfully ✓'),
+                ),
+              ],
+            ),
+            backgroundColor: AppColors.success,
+            duration: const Duration(seconds: 4),
           ),
-          backgroundColor: AppColors.success,
-        ),
-      );
+        );
+      }
 
       _ordersTabKey.currentState?.reload();
     }

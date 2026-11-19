@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../widgets/zenqube_logo.dart';
+
 
 class LoadingScreen extends StatefulWidget {
   final VoidCallback onLoadingComplete;
@@ -17,18 +17,18 @@ class LoadingScreen extends StatefulWidget {
 
 class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateMixin {
   double _progress = 0.0;
-  String _statusText = 'Booting ZenQube Portal...';
+  String _statusText = "Booting Hungrily Food's Portal...";
   Timer? _timer;
   late AnimationController _fadeController;
   late AnimationController _gridController;
 
   final List<Map<String, dynamic>> _loadingStages = [
-    {'min': 0.0, 'max': 0.15, 'text': 'Booting ZenQube Portal...'},
+    {'min': 0.0, 'max': 0.15, 'text': "Booting Hungrily Food's Portal..."},
     {'min': 0.15, 'max': 0.40, 'text': 'Connecting to dining databases...'},
     {'min': 0.40, 'max': 0.70, 'text': 'Caching weekly menu plans...'},
     {'min': 0.70, 'max': 0.90, 'text': 'Synchronizing smart meal tokens...'},
     {'min': 0.90, 'max': 0.99, 'text': 'Finalizing secure connection...'},
-    {'min': 1.0, 'max': 1.0, 'text': 'Welcome to ZenQube Dining!'},
+    {'min': 1.0, 'max': 1.0, 'text': "Welcome to Hungrily Food's!"},
   ];
 
   @override
@@ -81,7 +81,7 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
 
         if (_progress >= 1.0) {
           _timer?.cancel();
-          _statusText = 'Welcome to ZenQube Dining!';
+          _statusText = "Welcome to Hungrily Food's!";
           // Grace period for completion before triggering navigation
           Future.delayed(const Duration(milliseconds: 800), () {
             if (mounted) {
@@ -168,11 +168,49 @@ class _LoadingScreenState extends State<LoadingScreen> with TickerProviderStateM
                     children: [
                       const Spacer(flex: 3),
                       // Glowing, pulsating vector logo
-                      ZenQubeLogo(
-                        size: 200,
-                        showText: true,
-                        animate: true,
-                        progress: _progress,
+                      Container(
+                        width: 200,
+                        height: 200,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white,
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF00C6FF).withOpacity(0.2),
+                              blurRadius: 25,
+                              spreadRadius: 2,
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Image.asset(
+                              'assets/images/logo.png',
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      ShaderMask(
+                        shaderCallback: (bounds) => const LinearGradient(
+                          colors: [
+                            Color(0xFFFF9900),
+                            Color(0xFF007A33),
+                          ],
+                          begin: Alignment.centerLeft,
+                          end: Alignment.centerRight,
+                        ).createShader(bounds),
+                        child: const Text(
+                          "HUNGRILY FOOD'S",
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 2.0,
+                            color: Colors.white,
+                          ),
+                        ),
                       ),
                       const Spacer(flex: 2),
                       

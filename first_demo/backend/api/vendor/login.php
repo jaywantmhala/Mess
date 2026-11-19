@@ -31,7 +31,7 @@ if (empty($password))      { sendError('Password is required.', 422); }
 $pdo = getDBConnection();
 
 $stmt = $pdo->prepare("
-    SELECT id, full_name, email, password, is_active, created_at
+    SELECT id, full_name, email, phone, country, state, district, taluka, password, is_active, created_at
     FROM vendors WHERE email = :email LIMIT 1
 ");
 $stmt->execute([':email' => $email]);
@@ -48,6 +48,13 @@ if (!(bool)$vendor['is_active']) {
 // Strip password
 unset($vendor['password']);
 
+// Optional FCM Token update on login
+$fcmToken = trim($body['fcm_token'] ?? '');
+if (!empty($fcmToken)) {
+    $pdo->prepare("UPDATE vendors SET fcm_token = :fcm, updated_at = NOW() WHERE id = :id")
+        ->execute([':id' => $vendor['id'], ':fcm' => $fcmToken]);
+}
+
 // JWT
 $token = JWT::generate([
     'sub'       => (int) $vendor['id'],
@@ -56,7 +63,10 @@ $token = JWT::generate([
     'role'      => 'vendor',
 ]);
 
+$refreshToken = JWT::generateRefreshToken((int) $vendor['id'], 'vendor', $pdo);
+
 sendSuccess('Login successful.', [
-    'token'  => $token,
-    'vendor' => $vendor,
+    'token'         => $token,
+    'refresh_token' => $refreshToken,
+    'vendor'        => $vendor,
 ]);

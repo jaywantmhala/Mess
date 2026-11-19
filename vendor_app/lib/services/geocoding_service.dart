@@ -30,7 +30,7 @@ class GeocodingService {
       final response = await http.get(
         url,
         headers: {
-          'User-Agent': 'ZenQubeVendorApp/1.0',
+          'User-Agent': 'HungrilyFoodsVendorApp/1.0',
           'Accept-Language': 'en',
         },
       );

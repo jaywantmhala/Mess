@@ -4,23 +4,30 @@ class WalletBalance {
   final int walletId;
   final int customerId;
   final double balance;
+  final double planCreditBalance;
 
   const WalletBalance({
     required this.walletId,
     required this.customerId,
     required this.balance,
+    this.planCreditBalance = 0.0,
   });
+
+  /// Own balance = total balance minus plan credits
+  double get ownBalance => (balance - planCreditBalance).clamp(0, double.infinity);
 
   factory WalletBalance.fromJson(Map<String, dynamic> json) => WalletBalance(
         walletId: int.parse(json['wallet_id'].toString()),
         customerId: int.parse(json['customer_id'].toString()),
         balance: double.parse(json['balance'].toString()),
+        planCreditBalance: double.tryParse(json['plan_credit_balance']?.toString() ?? '0') ?? 0.0,
       );
 
-  WalletBalance copyWith({double? balance}) => WalletBalance(
+  WalletBalance copyWith({double? balance, double? planCreditBalance}) => WalletBalance(
         walletId: walletId,
         customerId: customerId,
         balance: balance ?? this.balance,
+        planCreditBalance: planCreditBalance ?? this.planCreditBalance,
       );
 }
 

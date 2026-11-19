@@ -59,6 +59,18 @@ $country  = isset($body['country'])   ? sanitize($body['country'])   : null;
 $pincode  = isset($body['pincode'])   ? sanitize($body['pincode'])   : null;
 $landmark = isset($body['landmark'])  ? sanitize($body['landmark'])  : null;
 $photoUrl = isset($body['photo_url'])  ? sanitize($body['photo_url'])  : null;
+$fssaiNumber        = isset($body['fssai_number'])        ? sanitize($body['fssai_number'])        : null;
+$fssaiPhotoUrl      = isset($body['fssai_photo_url'])      ? sanitize($body['fssai_photo_url'])      : null;
+$panNumber          = isset($body['pan_number'])          ? sanitize($body['pan_number'])          : null;
+$panPhotoUrl        = isset($body['pan_photo_url'])        ? sanitize($body['pan_photo_url'])        : null;
+$aadharNumber       = isset($body['aadhar_number'])       ? sanitize($body['aadhar_number'])       : null;
+$aadharPhotoUrl     = isset($body['aadhar_photo_url'])     ? sanitize($body['aadhar_photo_url'])     : null;
+$shopActNumber      = isset($body['shop_act_number'])      ? sanitize($body['shop_act_number'])      : null;
+$shopActPhotoUrl    = isset($body['shop_act_photo_url'])    ? sanitize($body['shop_act_photo_url'])    : null;
+$udyamAadharNumber  = isset($body['udyam_aadhar_number'])  ? sanitize($body['udyam_aadhar_number'])  : null;
+$udyamAadharPhotoUrl= isset($body['udyam_aadhar_photo_url'])? sanitize($body['udyam_aadhar_photo_url']): null;
+$gstNumber          = isset($body['gst_number'])          ? sanitize($body['gst_number'])          : null;
+$gstPhotoUrl        = isset($body['gst_photo_url'])        ? sanitize($body['gst_photo_url'])        : null;
 
 if (empty($ownerName))     { sendError('Owner name is required.', 422); }
 if (empty($mobileNumber))  { sendError('Mobile number is required.', 422); }
@@ -107,27 +119,64 @@ $stmt = $pdo->prepare("
         pincode = :pincode, 
         landmark = :landmark, 
         photo_url = COALESCE(:photo_url, photo_url),
+        fssai_number = :fssai_number,
+        fssai_photo_url = COALESCE(:fssai_photo_url, fssai_photo_url),
+        pan_number = :pan_number,
+        pan_photo_url = COALESCE(:pan_photo_url, pan_photo_url),
+        aadhar_number = :aadhar_number,
+        aadhar_photo_url = COALESCE(:aadhar_photo_url, aadhar_photo_url),
+        shop_act_number = :shop_act_number,
+        shop_act_photo_url = COALESCE(:shop_act_photo_url, shop_act_photo_url),
+        udyam_aadhar_number = :udyam_aadhar_number,
+        udyam_aadhar_photo_url = COALESCE(:udyam_aadhar_photo_url, udyam_aadhar_photo_url),
+        gst_number = :gst_number,
+        gst_photo_url = COALESCE(:gst_photo_url, gst_photo_url),
+        service_type = :service_type,
+        food_type = :food_type,
         updated_at = NOW()
     WHERE id = :id AND vendor_id = :vendor_id
 ");
+$serviceType = isset($body['service_type']) ? strtoupper(sanitize($body['service_type'])) : 'BOTH';
+if (!in_array($serviceType, ['DINING', 'DELIVERY', 'BOTH'])) {
+    $serviceType = 'BOTH';
+}
+$foodType = isset($body['food_type']) ? strtoupper(sanitize($body['food_type'])) : 'BOTH';
+if (!in_array($foodType, ['VEG', 'NON_VEG', 'BOTH'])) {
+    $foodType = 'BOTH';
+}
+
 $stmt->execute([
-    ':id'            => $hotelId,
-    ':vendor_id'     => $vendorId,
-    ':hotel_name'    => $hotelName,
-    ':owner_name'    => $ownerName,
-    ':mobile_number' => $mobileNumber,
-    ':email'         => $email,
-    ':hotel_address' => $hotelAddress,
-    ':latitude'      => $latitude,
-    ':longitude'     => $longitude,
-    ':place_id'      => $placeId,
-    ':city'          => $city,
-    ':area'          => $area,
-    ':state'         => $state,
-    ':country'       => $country,
-    ':pincode'       => $pincode,
-    ':landmark'      => $landmark,
-    ':photo_url'     => $photoUrl,
+    ':id'                     => $hotelId,
+    ':vendor_id'              => $vendorId,
+    ':hotel_name'             => $hotelName,
+    ':owner_name'             => $ownerName,
+    ':mobile_number'          => $mobileNumber,
+    ':email'                  => $email,
+    ':hotel_address'          => $hotelAddress,
+    ':latitude'               => $latitude,
+    ':longitude'              => $longitude,
+    ':place_id'               => $placeId,
+    ':city'                   => $city,
+    ':area'                   => $area,
+    ':state'                  => $state,
+    ':country'                => $country,
+    ':pincode'                => $pincode,
+    ':landmark'               => $landmark,
+    ':photo_url'              => $photoUrl,
+    ':fssai_number'           => $fssaiNumber,
+    ':fssai_photo_url'        => $fssaiPhotoUrl,
+    ':pan_number'             => $panNumber,
+    ':pan_photo_url'           => $panPhotoUrl,
+    ':aadhar_number'          => $aadharNumber,
+    ':aadhar_photo_url'       => $aadharPhotoUrl,
+    ':shop_act_number'        => $shopActNumber,
+    ':shop_act_photo_url'     => $shopActPhotoUrl,
+    ':udyam_aadhar_number'   => $udyamAadharNumber,
+    ':udyam_aadhar_photo_url' => $udyamAadharPhotoUrl,
+    ':gst_number'             => $gstNumber,
+    ':gst_photo_url'          => $gstPhotoUrl,
+    ':service_type'           => $serviceType,
+    ':food_type'              => $foodType,
 ]);
 
 // Fetch updated hotel details

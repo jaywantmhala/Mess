@@ -1,0 +1,1517 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  
+  <!-- SEO Primary Meta Tags -->
+  <title>Hungrily – Fresh, Homestyle Meals Delivered Daily | Tiffin Services</title>
+  <meta name="title" content="Hungrily – Fresh, Homestyle Meals Delivered Daily | Tiffin Services" />
+  <meta name="description" content="Subscribe to Hungrily Tiffin Services for authentic, fresh, homemade Veg & Non-Veg Indian Tiffin boxes delivered hot to offices, homes & hostels. Wholesome everyday nutrition!" />
+  <meta name="keywords" content="tiffin service, daily tiffin delivery, indian tiffin service, homestyle tiffin box, fresh meals delivered daily, veg tiffin subscription, student tiffin delivery, office lunch tiffin" />
+  <meta name="author" content="Hungrily Tiffin Services" />
+  <meta name="robots" content="index, follow" />
+
+  <!-- Open Graph / Social Media Meta -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://hungrilyfoods.com/" />
+  <meta property="og:title" content="Hungrily – Fresh, Homestyle Meals Delivered Daily" />
+  <meta property="og:description" content="Wholesome, balanced and delicious home-cooked meals made with love and the freshest ingredients. Perfect for your everyday nutrition." />
+  <meta property="og:image" content="assets/tiffin.png" />
+
+  <!-- Twitter Meta -->
+  <meta property="twitter:card" content="summary_large_image" />
+  <meta property="twitter:title" content="Hungrily – Fresh, Homestyle Meals Delivered Daily" />
+  <meta property="twitter:description" content="Fresh homemade Indian Tiffin Service delivered hot on wheels. Healthy, affordable daily tiffin plans for professionals & students." />
+  <meta property="twitter:image" content="assets/tiffin.png" />
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="assets/hungrily-logo.png" />
+  
+  <!-- Custom Fonts: Bricolage Grotesque (Headings) & Satoshi (Body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,800,900&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brandOrange: {
+              DEFAULT: '#FF6B00',
+              hover: '#E05D00',
+              light: '#FFF0E5',
+            },
+            brandGreen: {
+              DEFAULT: '#133E1A',
+              hover: '#1B5422',
+              darker: '#0A250F',
+            },
+            heroBg: {
+              DEFAULT: '#FAF4EB',
+              surface: '#F4ECD9',
+            }
+          },
+          fontFamily: {
+            display: ['"Bricolage Grotesque"', 'sans-serif'],
+            serif: ['"Bricolage Grotesque"', 'sans-serif'],
+            sans: ['"Satoshi"', '"Plus Jakarta Sans"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- JSON-LD Structured Data for Google SEO -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FoodService",
+    "name": "Hungrily Tiffin Services",
+    "image": "https://hungrilyfoods.com/assets/tiffin.png",
+    "@id": "https://hungrilyfoods.com",
+    "url": "https://hungrilyfoods.com",
+    "telephone": "+918625018625",
+    "priceRange": "₹90 - ₹180 per tiffin",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "Nagapur",
+      "addressLocality": "Ahilya Nagar",
+      "addressRegion": "Maharashtra",
+      "countryName": "India"
+    },
+    "servesCuisine": [
+      "Indian Tiffin Service",
+      "Home Cooked Thali",
+      "Vegetarian Tiffin Box",
+      "Non-Vegetarian Tiffin Box",
+      "Office Lunch Tiffin"
+    ],
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "4.9",
+      "reviewCount": "14200"
+    },
+    "sameAs": [
+      "https://www.facebook.com/p/Hungrily-Foods-61594923717195/",
+      "https://www.instagram.com/hung_rilyfoods/"
+    ]
+  }
+  </script>
+
+  <style>
+    ::-webkit-scrollbar {
+      width: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #FAF4EB;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #D8C7B0;
+      border-radius: 5px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #FF6B00;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: rgba(10, 37, 15, 0.78);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .hidden-modal {
+      display: none !important;
+    }
+
+    .faq-answer {
+      max-height: 0;
+      opacity: 0;
+      overflow: hidden;
+      padding-bottom: 0;
+      transition: max-height 0.35s ease-in-out, opacity 0.25s ease-in-out, padding-bottom 0.35s ease-in-out;
+    }
+    .faq-answer.active {
+      max-height: 350px;
+      opacity: 1;
+      padding-bottom: 1.25rem;
+    }
+  </style>
+</head>
+<body class="bg-[#FAF4EB] text-[#133E1A] font-sans antialiased overflow-x-hidden">
+
+  <!-- STICKY HEADER (100% DESIGN MATCH TO REFERENCE IMAGE) -->
+  <header id="navbar" class="fixed top-0 left-0 right-0 z-[900] transition-all duration-300 bg-[#FAF4EB]/90 backdrop-blur-md py-2.5 border-b border-black/5">
+    <div class="max-w-[1280px] mx-auto px-6 lg:px-12 flex items-center justify-between">
+      
+      <!-- Brand Logo -->
+      <a href="#home" class="flex items-center gap-3 no-underline shrink-0" aria-label="Hungrily Home">
+        <img src="assets/hungrily-logo.png" alt="Hungrily Logo" style="width: 48px; height: 48px;" class="w-12 h-12 sm:w-16 sm:h-16 rounded-full object-contain drop-shadow-sm shrink-0" />
+      </a>
+
+      <!-- Desktop Navigation Links with Active Orange Underline -->
+      <nav class="hidden md:flex items-center gap-7 text-sm font-semibold text-[#133E1A]">
+        <a href="#home" class="relative py-1 text-[#133E1A] font-bold after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-full after:h-[2.5px] after:bg-[#FF6B00] after:rounded-full no-underline">Home</a>
+        <a href="#about-us" class="py-1 text-[#133E1A]/80 hover:text-[#FF6B00] transition-colors no-underline">About Us</a>
+        <a href="#meal-timings" class="py-1 text-[#133E1A]/80 hover:text-[#FF6B00] transition-colors no-underline">Meal Timings</a>
+        <a href="#how-it-works" class="py-1 text-[#133E1A]/80 hover:text-[#FF6B00] transition-colors no-underline">How It Works</a>
+        <a href="vendor.html" class="py-1 text-[#FF6B00] font-extrabold hover:text-[#E05D00] transition-colors no-underline flex items-center gap-1"><span class="px-2 py-0.5 bg-[#FF6B00]/10 text-[#FF6B00] text-xs font-bold rounded-full border border-[#FF6B00]/20">Partner</span> Vendor</a>
+        <a href="#contact" class="py-1 text-[#133E1A]/80 hover:text-[#FF6B00] transition-colors no-underline">Contact Us</a>
+      </nav>
+
+      <!-- Right Action CTA Button -->
+      <div class="flex items-center gap-3">
+        <a href="https://play.google.com/store/apps/details?id=com.zenqube.hungrilyfoods" target="_blank" rel="noopener noreferrer" class="px-5 py-2.5 bg-[#133E1A] text-white font-bold text-xs sm:text-sm rounded-full shadow-md hover:bg-[#1B5422] transition-all flex items-center gap-1.5 no-underline">
+          <span>Get App</span>
+          <i data-lucide="chevron-right" class="w-4 h-4 text-white"></i>
+        </a>
+
+        <button id="mobile-menu-btn" onclick="toggleMobileMenu()" class="md:hidden p-1.5 text-[#133E1A] bg-transparent border-0 cursor-pointer">
+          <i data-lucide="menu" class="w-7 h-7"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Drawer Navigation -->
+    <div id="mobile-drawer" class="hidden absolute top-full left-0 right-0 bg-[#FAF4EB] border-b-2 border-[#FF6B00] p-6 shadow-2xl flex flex-col gap-3">
+      <a href="#home" onclick="toggleMobileMenu()" class="flex items-center justify-between py-2 text-[#133E1A] font-bold text-base border-b border-[#133E1A]/10">
+        <span>Home</span>
+        <i data-lucide="chevron-right" class="w-4 h-4 text-[#FF6B00]"></i>
+      </a>
+      <a href="#about-us" onclick="toggleMobileMenu()" class="flex items-center justify-between py-2 text-[#133E1A] font-bold text-base border-b border-[#133E1A]/10">
+        <span>About Us</span>
+        <i data-lucide="chevron-right" class="w-4 h-4 text-[#FF6B00]"></i>
+      </a>
+      <a href="#meal-timings" onclick="toggleMobileMenu()" class="flex items-center justify-between py-2 text-[#133E1A] font-bold text-base border-b border-[#133E1A]/10">
+        <span>Meal Timings</span>
+        <i data-lucide="chevron-right" class="w-4 h-4 text-[#FF6B00]"></i>
+      </a>
+      <a href="#how-it-works" onclick="toggleMobileMenu()" class="flex items-center justify-between py-2 text-[#133E1A] font-bold text-base border-b border-[#133E1A]/10">
+        <span>How It Works</span>
+        <i data-lucide="chevron-right" class="w-4 h-4 text-[#FF6B00]"></i>
+      </a>
+      <a href="vendor.html" onclick="toggleMobileMenu()" class="flex items-center justify-between py-2 text-[#FF6B00] font-extrabold text-base border-b border-[#133E1A]/10">
+        <span class="flex items-center gap-2">
+          <i data-lucide="store" class="w-4 h-4 text-[#FF6B00]"></i>
+          <span>Partner as Vendor</span>
+        </span>
+        <i data-lucide="chevron-right" class="w-4 h-4 text-[#FF6B00]"></i>
+      </a>
+      <a href="#contact" onclick="toggleMobileMenu()" class="flex items-center justify-between py-2 text-[#133E1A] font-bold text-base border-b border-[#133E1A]/10">
+        <span>Contact Us</span>
+        <i data-lucide="chevron-right" class="w-4 h-4 text-[#FF6B00]"></i>
+      </a>
+      <button onclick="toggleMobileMenu(); openTiffinModal('Trial Tiffin')" class="w-full mt-2 py-3 bg-[#FF6B00] text-white font-bold text-xs rounded-full shadow-sm flex items-center justify-center gap-1.5">
+        <i data-lucide="box" class="w-4 h-4"></i>
+        <span>Subscribe Tiffin Plan</span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- HERO SECTION (100% DESIGN & CONTENT MATCH TO REFERENCE IMAGE) -->
+    <section id="home" class="pt-24 sm:pt-28 pb-8 sm:pb-10 relative overflow-hidden bg-[#FAF4EB]">
+      
+      <!-- Subtle Background Leaf Illustration in Center Backdrop -->
+      <div class="absolute top-12 left-[44%] w-64 h-64 opacity-25 pointer-events-none z-0">
+        <svg viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M100 20C120 60 160 80 180 100C160 120 120 140 100 180C80 140 40 120 20 100C40 80 80 60 100 20Z" stroke="#FF6B00" stroke-width="1.8" />
+        </svg>
+      </div>
+
+      <div class="max-w-[1280px] mx-auto px-6 lg:px-12 relative z-10">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          
+          <!-- Left Hero Content Column -->
+          <div class="lg:col-span-6 flex flex-col items-start text-left">
+            
+            <!-- Top Pill Badge: Currently Started in Pune & Ahilyanagar & Other Cities In Progress -->
+            <div class="inline-flex items-center gap-2 px-4 py-2 bg-[#FFF0E5] border border-[#FF6B00]/30 rounded-full text-xs font-bold text-[#133E1A] shadow-sm mb-6 flex-wrap">
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#10B981]/15 text-[#10B981] font-extrabold text-[0.70rem] uppercase tracking-wide">
+                <span class="w-2 h-2 rounded-full bg-[#10B981] animate-pulse"></span> Currently Started
+              </span>
+              <span class="text-[#FF6B00] font-extrabold flex items-center gap-1">
+                <i data-lucide="map-pin" class="w-3.5 h-3.5 text-[#FF6B00]"></i> Pune &amp; Ahilyanagar
+              </span>
+              <span class="text-[#133E1A]/30 font-bold hidden sm:inline">•</span>
+              <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FF6B00]/15 text-[#FF6B00] font-extrabold text-[0.70rem]">
+                <span class="w-1.5 h-1.5 rounded-full bg-[#FF6B00] animate-ping"></span> Other Cities In Progress
+              </span>
+            </div>
+
+            <!-- SEO Main Headline (Exact text & colors matching screenshot) -->
+            <h1 class="font-serif text-4xl sm:text-5xl lg:text-[3.6rem] font-extrabold text-[#133E1A] leading-[1.15] mb-5 tracking-tight">
+              Fresh, Homestyle <br />
+              Meals <span class="text-[#FF6B00]">Delivered Daily</span>
+            </h1>
+
+            <!-- Paragraph Text (Exact text matching screenshot) -->
+            <p class="text-base sm:text-lg text-[#133E1A]/80 mb-8 max-w-[480px] leading-relaxed font-medium">
+              Wholesome, balanced and delicious home-cooked meals made with love and the freshest ingredients. Perfect for your everyday nutrition.
+            </p>
+
+            <!-- App Download Play Store Button -->
+            <div class="flex items-center gap-4 flex-wrap mb-10">
+              <a href="https://play.google.com/store/apps/details?id=com.zenqube.hungrilyfoods" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-3.5 px-8 py-4 bg-[#FF6B00] text-white font-bold rounded-full shadow-lg hover:bg-[#E05D00] hover:shadow-xl transition-all duration-300 transform hover:-translate-y-0.5 no-underline group">
+                <svg class="w-7 h-7 fill-current text-white shrink-0 group-hover:scale-110 transition-transform" viewBox="0 0 24 24">
+                  <path d="M3,20.5V3.5C3,2.91 3.34,2.39 3.84,2.15L13.69,12L3.84,21.85C3.34,21.6 3,21.09 3,20.5M16.81,15.12L6.05,21.34L14.54,12.85L16.81,15.12M20.16,10.81C20.5,11.08 20.75,11.5 20.75,12C20.75,12.5 20.53,12.9 20.18,13.18L17.89,14.5L15.39,12L17.89,9.5L20.16,10.81M6.05,2.66L16.81,8.88L14.54,11.15L6.05,2.66Z" />
+                </svg>
+                <div class="flex flex-col items-start leading-tight">
+                  <span class="text-[0.68rem] uppercase tracking-wider font-semibold opacity-90">GET IT ON</span>
+                  <span class="text-base sm:text-lg font-extrabold tracking-tight">Google Play</span>
+                </div>
+              </a>
+            </div>
+
+            <!-- Trust Highlights Bottom Row (Exact icons & text matching screenshot) -->
+            <div class="flex items-center gap-6 flex-wrap text-xs sm:text-sm font-bold text-[#133E1A]/80">
+              <div class="flex items-center gap-2">
+                <i data-lucide="sparkles" class="w-4.5 h-4.5 text-[#FF6B00]"></i>
+                <span>No Preservatives</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <i data-lucide="shield-check" class="w-4.5 h-4.5 text-[#FF6B00]"></i>
+                <span>100% Veg</span>
+              </div>
+              <div class="flex items-center gap-2">
+                <i data-lucide="shield" class="w-4.5 h-4.5 text-[#FF6B00]"></i>
+                <span>Hygienic Kitchen</span>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Right Hero Visual Column (FEATURING TIFFIN.PNG WITH MINIMAL BLUR) -->
+          <div class="lg:col-span-6 relative flex items-center justify-center mt-6 lg:mt-0">
+            
+            <!-- Floating Decorative Green Leaf Overlay near bottom-left of Dish -->
+            <div class="absolute -bottom-4 -left-4 z-20 pointer-events-none hidden sm:block">
+              <svg width="54" height="54" viewBox="0 0 100 100" fill="none">
+                <path d="M50 10 C 30 40, 10 60, 50 90 C 70 60, 90 40, 50 10" fill="#4B8B3B" opacity="0.85" />
+                <path d="M50 10 C 40 40, 30 60, 50 90" stroke="#FAF4EB" stroke-width="2.5" />
+              </svg>
+            </div>
+
+            <!-- tiffin.png image container with clean, crisp rendering and proper mobile scaling -->
+            <div class="relative z-10 w-full flex justify-center lg:justify-end">
+              <img 
+                src="assets/tiffin.png" 
+                alt="Fresh Homestyle Indian Tiffin Meals Delivered Daily" 
+                style="filter: drop-shadow(0 16px 24px rgba(19, 62, 26, 0.16));" 
+                class="w-full max-w-[280px] sm:max-w-[400px] lg:max-w-[480px] max-h-[500px] h-auto object-contain block mx-auto transition-transform duration-500 hover:scale-[1.02]" 
+              />
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- LIVE STATS & CITIES SECTION (DYNAMIC LIVE DATA FROM DATABASE) -->
+    <section id="community-stats" class="py-8 bg-white border-y border-[#133E1A]/10 relative z-20 shadow-sm">
+      <div class="max-w-[1280px] mx-auto px-6 lg:px-12">
+        
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <div class="inline-flex items-center gap-2 px-3.5 py-1 bg-[#133E1A]/5 border border-[#133E1A]/10 rounded-full text-[0.72rem] font-bold text-[#133E1A] uppercase mb-1.5">
+              <span class="w-2 h-2 rounded-full bg-[#10B981] animate-ping"></span>
+              <span>LIVE DATABASE STATS</span>
+            </div>
+            <h3 class="font-serif text-2xl sm:text-3xl font-extrabold text-[#133E1A]">
+              Our Growing Food <span class="text-[#FF6B00]">Community</span>
+            </h3>
+          </div>
+          
+          <!-- Currently Started & Other Cities In Progress Tag -->
+          <div class="flex flex-wrap items-center gap-2">
+            <div class="inline-flex items-center gap-2 px-3.5 py-2 bg-[#FAF4EB] border border-[#10B981]/30 rounded-2xl text-xs sm:text-sm font-bold text-[#133E1A] shadow-xs">
+              <span class="w-2.5 h-2.5 rounded-full bg-[#10B981] animate-pulse"></span>
+              <span>Currently Started In: <strong class="text-[#10B981] font-extrabold">Pune &amp; Ahilyanagar</strong></span>
+            </div>
+            <div class="inline-flex items-center gap-2 px-3.5 py-2 bg-[#FFF0E5] border border-[#FF6B00]/30 rounded-2xl text-xs sm:text-sm font-bold text-[#FF6B00] shadow-xs">
+              <span class="w-2 h-2 rounded-full bg-[#FF6B00] animate-ping"></span>
+              <span>Other Cities In Progress</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3 Metrics Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+          
+          <!-- Card 1: Registered Customers -->
+          <div class="p-5 sm:p-6 rounded-3xl bg-[#FAF4EB] border border-[#133E1A]/10 shadow-sm flex items-center gap-4 hover:border-[#FF6B00]/40 transition-all hover:-translate-y-1 duration-300">
+            <div class="w-14 h-14 rounded-2xl bg-[#133E1A] text-white flex items-center justify-center shrink-0 shadow-md">
+              <i data-lucide="users" class="w-7 h-7 text-[#FF6B00]"></i>
+            </div>
+            <div>
+              <div class="flex items-baseline gap-1">
+                <span id="stat-customers-count" class="font-serif text-3xl sm:text-4xl font-extrabold text-[#133E1A]">--</span>
+                <span class="text-[#FF6B00] font-extrabold text-xl">+</span>
+              </div>
+              <p class="text-xs sm:text-sm font-bold text-[#133E1A] mt-0.5">Active Customers</p>
+              <p class="text-[0.70rem] text-[#133E1A]/65 font-medium">Enjoying fresh everyday homestyle meals</p>
+            </div>
+          </div>
+
+          <!-- Card 2: Vendor Partners -->
+          <div class="p-5 sm:p-6 rounded-3xl bg-[#FAF4EB] border border-[#133E1A]/10 shadow-sm flex items-center gap-4 hover:border-[#FF6B00]/40 transition-all hover:-translate-y-1 duration-300">
+            <div class="w-14 h-14 rounded-2xl bg-[#FF6B00] text-white flex items-center justify-center shrink-0 shadow-md">
+              <i data-lucide="store" class="w-7 h-7 text-white"></i>
+            </div>
+            <div>
+              <div class="flex items-baseline gap-1">
+                <span id="stat-vendors-count" class="font-serif text-3xl sm:text-4xl font-extrabold text-[#133E1A]">--</span>
+                <span class="text-[#FF6B00] font-extrabold text-xl">+</span>
+              </div>
+              <p class="text-xs sm:text-sm font-bold text-[#133E1A] mt-0.5">Mess &amp; Vendor Partners</p>
+              <p class="text-[0.70rem] text-[#133E1A]/65 font-medium">Verified local kitchens &amp; tiffin providers</p>
+            </div>
+          </div>
+
+          <!-- Card 3: Active Serving Cities & Expansion -->
+          <div class="p-5 sm:p-6 rounded-3xl bg-[#FAF4EB] border border-[#133E1A]/10 shadow-sm flex items-center gap-4 hover:border-[#10B981]/40 transition-all hover:-translate-y-1 duration-300">
+            <div class="w-14 h-14 rounded-2xl bg-[#10B981] text-white flex items-center justify-center shrink-0 shadow-md">
+              <i data-lucide="map-pin" class="w-7 h-7 text-white"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="font-serif text-2xl sm:text-3xl font-extrabold text-[#133E1A]">2 Cities</span>
+                <span class="px-2 py-0.5 rounded-full bg-[#10B981]/15 text-[#10B981] font-extrabold text-[0.68rem] uppercase">Live</span>
+              </div>
+              <p class="text-[0.75rem] text-[#133E1A] font-extrabold mt-0.5">
+                📍 Pune &bull; 📍 Ahilyanagar
+              </p>
+              <div class="mt-2 pt-1.5 border-t border-[#133E1A]/10 flex items-center gap-1.5 text-[0.72rem] font-bold text-[#FF6B00]">
+                <span class="w-2 h-2 rounded-full bg-[#FF6B00] animate-ping"></span>
+                <span>Other Cities In Progress</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- HOW IT WORKS SECTION -->
+    <section id="how-it-works" class="py-8 sm:py-10 bg-[#FAF4EB] relative">
+      <div class="max-w-[1280px] mx-auto px-6 lg:px-12">
+        
+        <div class="text-center max-w-[700px] mx-auto mb-12">
+          <div class="inline-flex items-center gap-2 px-4 py-1.5 bg-[#133E1A]/5 border border-[#133E1A]/15 rounded-full text-xs font-bold tracking-widest text-[#133E1A] uppercase mb-3">
+            <i data-lucide="sparkles" class="w-4 h-4 text-[#FF6B00]"></i>
+            <span>4 EASY STEPS</span>
+          </div>
+          <h2 class="font-serif text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#133E1A] mb-4">
+            How Your Tiffin <span class="text-[#FF6B00]">Reaches You</span>
+          </h2>
+          <p class="text-base text-[#133E1A]/75 leading-relaxed">
+            Simple 4-step process to order fresh homestyle thalis from trusted local kitchens delivered hot to your door.
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          
+          <!-- Step 1 -->
+          <div class="bg-white rounded-3xl p-7 border border-[#133E1A]/10 shadow-md relative flex flex-col justify-between hover:-translate-y-2 transition-all duration-300">
+            <div>
+              <div class="flex items-center justify-between mb-5">
+                <span class="font-serif text-3xl font-extrabold text-[#FF6B00]">01</span>
+                <div class="w-12 h-12 rounded-2xl bg-[#FF6B00]/15 text-[#FF6B00] flex items-center justify-center">
+                  <i data-lucide="smartphone" class="w-6 h-6"></i>
+                </div>
+              </div>
+              <h3 class="font-serif text-xl font-bold text-[#133E1A] mb-2">Download App & Choose Plan</h3>
+              <p class="text-xs sm:text-sm text-[#133E1A]/75 leading-relaxed">Download the Hungrily Foods app and buy a meal plan according to your convenience.</p>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="bg-white rounded-3xl p-7 border border-[#133E1A]/10 shadow-md relative flex flex-col justify-between hover:-translate-y-2 transition-all duration-300">
+            <div>
+              <div class="flex items-center justify-between mb-5">
+                <span class="font-serif text-3xl font-extrabold text-[#FF6B00]">02</span>
+                <div class="w-12 h-12 rounded-2xl bg-[#FF6B00]/15 text-[#FF6B00] flex items-center justify-center">
+                  <i data-lucide="map-pin" class="w-6 h-6"></i>
+                </div>
+              </div>
+              <h3 class="font-serif text-xl font-bold text-[#133E1A] mb-2">Nearby Kitchens (&lt; 3 km)</h3>
+              <p class="text-xs sm:text-sm text-[#133E1A]/75 leading-relaxed">Discover trusted local hotels, mess & tiffin providers under a 3 km distance from your location.</p>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="bg-white rounded-3xl p-7 border border-[#133E1A]/10 shadow-md relative flex flex-col justify-between hover:-translate-y-2 transition-all duration-300">
+            <div>
+              <div class="flex items-center justify-between mb-5">
+                <span class="font-serif text-3xl font-extrabold text-[#FF6B00]">03</span>
+                <div class="w-12 h-12 rounded-2xl bg-[#FF6B00]/15 text-[#FF6B00] flex items-center justify-center">
+                  <i data-lucide="wallet" class="w-6 h-6"></i>
+                </div>
+              </div>
+              <h3 class="font-serif text-xl font-bold text-[#133E1A] mb-2">Select Tiffin & Wallet Pay</h3>
+              <p class="text-xs sm:text-sm text-[#133E1A]/75 leading-relaxed">Select your favorite thali from your nearest hotel, and the amount is automatically deducted from your wallet.</p>
+            </div>
+          </div>
+
+          <!-- Step 4 -->
+          <div class="bg-white rounded-3xl p-7 border border-[#133E1A]/10 shadow-md relative flex flex-col justify-between hover:-translate-y-2 transition-all duration-300">
+            <div>
+              <div class="flex items-center justify-between mb-5">
+                <span class="font-serif text-3xl font-extrabold text-[#FF6B00]">04</span>
+                <div class="w-12 h-12 rounded-2xl bg-[#FF6B00]/15 text-[#FF6B00] flex items-center justify-center">
+                  <i data-lucide="navigation" class="w-6 h-6"></i>
+                </div>
+              </div>
+              <h3 class="font-serif text-xl font-bold text-[#133E1A] mb-2">Live GPS Tracking</h3>
+              <p class="text-xs sm:text-sm text-[#133E1A]/75 leading-relaxed">Track your delivery executive live as your piping hot meal is delivered directly to your doorstep on wheels.</p>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- DAILY MEAL TIMINGS & ORDER SCHEDULE SECTION -->
+    <section id="meal-timings" class="py-8 sm:py-10 bg-[#F4ECD9] relative">
+      <div class="max-w-[1280px] mx-auto px-6 lg:px-12">
+        
+        <div class="text-center max-w-[700px] mx-auto mb-10">
+          <div class="inline-flex items-center gap-2 px-4 py-1.5 bg-[#133E1A]/5 border border-[#133E1A]/15 rounded-full text-xs font-bold tracking-widest text-[#133E1A] uppercase mb-3">
+            <i data-lucide="clock" class="w-4 h-4 text-[#FF6B00]"></i>
+            <span>ORDERING & DELIVERY SCHEDULE</span>
+          </div>
+          <h2 class="font-serif text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#133E1A] mb-3">
+            Daily Order Cut-off & <span class="text-[#FF6B00]">Delivery Timings</span>
+          </h2>
+          <p class="text-base text-[#133E1A]/75 leading-relaxed">
+            Please place your meal orders before cut-off times for guaranteed fresh, piping hot doorstep delivery.
+          </p>
+        </div>
+
+        <!-- Daily Ordering & Delivery Schedule Banner -->
+        <div class="bg-white rounded-3xl p-6 sm:p-8 lg:p-10 border border-[#133E1A]/12 shadow-xl relative overflow-hidden">
+          
+          <!-- Top Header Badge -->
+          <div class="flex items-center justify-between flex-wrap gap-4 mb-6 pb-4 border-b border-[#133E1A]/10">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-[#FF6B00]/15 text-[#FF6B00] flex items-center justify-center font-bold">
+                <i data-lucide="calendar-clock" class="w-5 h-5"></i>
+              </div>
+              <div>
+                <h4 class="font-serif text-xl font-extrabold text-[#133E1A]">Same-Day Order & Delivery Slots</h4>
+                <p class="text-xs text-[#133E1A]/70 font-medium">Freshly cooked meals delivered directly from local kitchens</p>
+              </div>
+            </div>
+            <div class="inline-flex items-center gap-2 px-3.5 py-1.5 bg-[#133E1A]/6 border border-[#133E1A]/15 rounded-full text-xs font-bold text-[#133E1A]">
+              <i data-lucide="zap" class="w-3.5 h-3.5 text-[#FF6B00]"></i>
+              <span>Guaranteed Hot Delivery</span>
+            </div>
+          </div>
+
+          <!-- 2 Service Columns: Lunch & Dinner -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            
+            <!-- Lunch Service Card -->
+            <div class="bg-[#FAF4EB] rounded-2xl p-6 border border-[#FF6B00]/20 flex flex-col justify-between relative group hover:border-[#FF6B00] transition-colors shadow-sm">
+              <div>
+                <div class="flex items-center justify-between mb-4">
+                  <div class="flex items-center gap-2.5">
+                    <span class="w-9 h-9 rounded-xl bg-[#FF6B00] text-white flex items-center justify-center font-bold text-base">
+                      ☀️
+                    </span>
+                    <h5 class="font-serif text-xl font-extrabold text-[#133E1A]">Lunch Meal Service</h5>
+                  </div>
+                  <span class="text-[0.70rem] font-extrabold uppercase bg-[#FF6B00]/15 text-[#FF6B00] px-3 py-1 rounded-full">Afternoon Slot</span>
+                </div>
+
+                <div class="space-y-3 text-xs sm:text-sm font-semibold text-[#133E1A] my-4">
+                  <div class="flex items-center justify-between p-3 bg-white rounded-xl border border-[#133E1A]/8">
+                    <span class="text-[#133E1A]/70">Order Cut-off Time:</span>
+                    <span class="font-extrabold text-[#FF6B00] flex items-center gap-1.5 text-sm">
+                      <i data-lucide="alarm-clock" class="w-4 h-4"></i> Before 9:00 AM
+                    </span>
+                  </div>
+                  <div class="flex items-center justify-between p-3 bg-white rounded-xl border border-[#133E1A]/8">
+                    <span class="text-[#133E1A]/70">Doorstep Delivery:</span>
+                    <span class="font-extrabold text-[#133E1A] flex items-center gap-1.5 text-sm">
+                      <i data-lucide="truck" class="w-4 h-4 text-[#FF6B00]"></i> After 12:00 PM
+                    </span>
+                  </div>
+                </div>
+
+                <p class="text-xs sm:text-sm text-[#133E1A]/75 leading-relaxed font-medium">
+                  Lunch orders received before 9 AM are prepared fresh early morning and delivered scalding hot between 12:00 PM and 1:30 PM.
+                </p>
+              </div>
+            </div>
+
+            <!-- Dinner Service Card -->
+            <div class="bg-[#FAF4EB] rounded-2xl p-6 border border-[#133E1A]/15 flex flex-col justify-between relative group hover:border-[#133E1A] transition-colors shadow-sm">
+              <div>
+                <div class="flex items-center justify-between mb-4">
+                  <div class="flex items-center gap-2.5">
+                    <span class="w-9 h-9 rounded-xl bg-[#133E1A] text-white flex items-center justify-center font-bold text-base">
+                      🌙
+                    </span>
+                    <h5 class="font-serif text-xl font-extrabold text-[#133E1A]">Dinner Meal Service</h5>
+                  </div>
+                  <span class="text-[0.70rem] font-extrabold uppercase bg-[#133E1A]/15 text-[#133E1A] px-3 py-1 rounded-full">Evening Slot</span>
+                </div>
+
+                <div class="space-y-3 text-xs sm:text-sm font-semibold text-[#133E1A] my-4">
+                  <div class="flex items-center justify-between p-3 bg-white rounded-xl border border-[#133E1A]/8">
+                    <span class="text-[#133E1A]/70">Order Cut-off Time:</span>
+                    <span class="font-extrabold text-[#FF6B00] flex items-center gap-1.5 text-sm">
+                      <i data-lucide="alarm-clock" class="w-4 h-4"></i> Before 4:00 PM
+                    </span>
+                  </div>
+                  <div class="flex items-center justify-between p-3 bg-white rounded-xl border border-[#133E1A]/8">
+                    <span class="text-[#133E1A]/70">Doorstep Delivery:</span>
+                    <span class="font-extrabold text-[#133E1A] flex items-center gap-1.5 text-sm">
+                      <i data-lucide="truck" class="w-4 h-4 text-[#FF6B00]"></i> After 7:00 PM
+                    </span>
+                  </div>
+                </div>
+
+                <p class="text-xs sm:text-sm text-[#133E1A]/75 leading-relaxed font-medium">
+                  Dinner orders received before 4 PM are cooked fresh late afternoon and delivered in thermal insulated boxes after 7:00 PM.
+                </p>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Bottom Extra Guidelines Feature Strip -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 border-t border-[#133E1A]/10 text-xs sm:text-sm text-[#133E1A] font-semibold">
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="shield-check" class="w-4.5 h-4.5 text-[#FF6B00] shrink-0"></i>
+              <span>Real-time live delivery tracking via App</span>
+            </div>
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="utensils" class="w-4.5 h-4.5 text-[#FF6B00] shrink-0"></i>
+              <span>Freshly prepared home-style food daily</span>
+            </div>
+            <div class="flex items-center gap-2.5">
+              <i data-lucide="package-check" class="w-4.5 h-4.5 text-[#FF6B00] shrink-0"></i>
+              <span>Insulated food-grade leak-proof packaging</span>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- OUR KITCHEN & STORY VIDEO SECTION -->
+    <section id="about-us" class="py-12 sm:py-16 bg-[#FAF4EB] relative overflow-hidden">
+      <div class="max-w-[1280px] mx-auto px-6 lg:px-12">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-14 items-center">
+          
+          <!-- Left Video Column (Portrait / 9:16 Video Frame) -->
+          <div class="lg:col-span-5 flex justify-center w-full">
+            <div class="relative w-full max-w-[340px] sm:max-w-[360px] pb-6 sm:pb-4">
+              
+              <!-- Dashed Background Border -->
+              <div class="absolute -top-4 -left-4 w-full h-[calc(100%-1.5rem)] sm:h-[calc(100%-1rem)] rounded-[32px] border-4 border-dashed border-[#FF6B00] opacity-35 z-0 pointer-events-none"></div>
+              
+              <!-- Video Player Box: Exactly 9:16 aspect ratio matching 720x1280 video -->
+              <div class="relative z-10 w-full rounded-[28px] overflow-hidden shadow-2xl border-4 border-white bg-black group" style="aspect-ratio: 9 / 16;">
+                <video 
+                  id="story-video"
+                  src="assets/video.mp4" 
+                  autoplay 
+                  loop 
+                  muted 
+                  playsinline 
+                  controls
+                  preload="auto"
+                  class="w-full h-full object-contain block rounded-[24px] bg-black">
+                  Your browser does not support the video tag.
+                </video>
+              </div>
+
+              <!-- Floating Badge -->
+              <div class="absolute bottom-0 -right-2 sm:-right-4 z-20 bg-[#133E1A] text-white px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl shadow-xl flex items-center gap-3 border border-white/20">
+                <div class="w-10 h-10 rounded-full bg-[#FF6B00] text-white flex items-center justify-center shrink-0 shadow-md">
+                  <i data-lucide="shield-check" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <div class="font-extrabold text-sm sm:text-base">100% Pure &amp; Hygienic</div>
+                  <div class="text-[0.72rem] sm:text-xs text-white/75">FSSAI Certified Cloud Kitchens</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Story Copy -->
+          <div class="lg:col-span-7 flex flex-col items-start mt-6 lg:mt-0">
+            <div class="inline-flex items-center gap-2 px-4 py-2 bg-[#133E1A]/5 border border-[#133E1A]/15 rounded-full text-[0.85rem] font-bold tracking-widest text-[#133E1A] uppercase mb-4">
+              <i data-lucide="sparkles" class="w-4 h-4 text-[#FF6B00]"></i>
+              <span>ABOUT HUNGRILY FOODS</span>
+            </div>
+
+            <h2 class="font-serif text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#133E1A] leading-tight mb-5">
+              Connecting You With <br /><span class="text-[#FF6B00]">Trusted Local Kitchens</span>
+            </h2>
+
+            <p class="text-base sm:text-lg text-[#133E1A]/90 mb-4 leading-relaxed font-semibold">
+              Hungrily Foods is a convenient food delivery platform that connects customers with trusted local mess and tiffin services. Discover fresh, delicious, and affordable homestyle meals delivered to your doorstep.
+            </p>
+
+            <p class="text-sm sm:text-base text-[#133E1A]/80 mb-4 leading-relaxed">
+              Browse daily menus, explore nearby food options, choose your preferred meals, and place orders easily through the Hungrily Foods app. We focus on making everyday meals simple, reliable, and convenient while supporting local food businesses.
+            </p>
+
+            <p class="text-sm sm:text-base text-[#133E1A]/80 mb-6 leading-relaxed">
+              Whether you need a wholesome lunch, satisfying dinner, or regular tiffin service, Hungrily Foods helps you enjoy fresh meals from local kitchens, delivered conveniently to your door.
+            </p>
+
+            <div class="flex flex-col gap-3.5 mb-8 w-full">
+              <div class="flex items-start gap-3">
+                <i data-lucide="check-circle-2" class="w-5 h-5 text-[#FF6B00] shrink-0 mt-0.5"></i>
+                <span class="text-xs sm:text-sm font-semibold text-[#133E1A]">Connect with trusted local mess & authentic tiffin services</span>
+              </div>
+              <div class="flex items-start gap-3">
+                <i data-lucide="check-circle-2" class="w-5 h-5 text-[#FF6B00] shrink-0 mt-0.5"></i>
+                <span class="text-xs sm:text-sm font-semibold text-[#133E1A]">Browse daily menus & choose wholesome lunch or dinner meals</span>
+              </div>
+              <div class="flex items-start gap-3">
+                <i data-lucide="check-circle-2" class="w-5 h-5 text-[#FF6B00] shrink-0 mt-0.5"></i>
+                <span class="text-xs sm:text-sm font-semibold text-[#133E1A]">Order easily via Hungrily Foods app with convenient doorstep delivery</span>
+              </div>
+            </div>
+
+            <a href="https://play.google.com/store/apps/details?id=com.zenqube.hungrilyfoods" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-3 px-8 py-4 bg-[#FF6B00] text-white font-extrabold text-sm sm:text-base rounded-full shadow-lg hover:bg-[#E05D00] hover:shadow-xl hover:-translate-y-0.5 transition-all no-underline">
+              <i data-lucide="smartphone" class="w-5 h-5"></i>
+              <span>Get Hungrily Foods App</span>
+            </a>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- SEO FAQ ACCORDION -->
+    <section id="faq" class="py-8 sm:py-10 bg-[#F4ECD9] border-t border-[#133E1A]/10">
+      <div class="max-w-[900px] mx-auto px-6">
+        
+        <div class="text-center mb-10">
+          <div class="inline-flex items-center gap-2 px-4 py-1.5 bg-[#133E1A]/5 border border-[#133E1A]/15 rounded-full text-xs font-bold text-[#133E1A] uppercase mb-3">
+            <i data-lucide="help-circle" class="w-4 h-4 text-[#FF6B00]"></i>
+            <span>FREQUENTLY ASKED QUESTIONS</span>
+          </div>
+          <h2 class="font-serif text-3xl sm:text-4xl font-extrabold text-[#133E1A] mb-3">
+            Everything About <span class="text-[#FF6B00]">Hungrily Foods</span>
+          </h2>
+          <p class="text-sm text-[#133E1A]/70">Have questions about food ordering or delivery timings? We've answered the most common ones below.</p>
+        </div>
+
+        <div class="space-y-4">
+          
+          <div class="bg-white rounded-2xl border border-[#133E1A]/10 shadow-sm overflow-hidden">
+            <button onclick="toggleFaq('faq-1')" class="w-full p-5 text-left flex items-center justify-between gap-4 font-serif text-lg font-bold text-[#133E1A] hover:text-[#FF6B00] transition-colors cursor-pointer">
+              <span>How does Hungrily Foods daily meal delivery work?</span>
+              <i id="faq-1-icon" data-lucide="chevron-down" class="w-5 h-5 text-[#FF6B00] transition-transform"></i>
+            </button>
+            <div id="faq-1" class="faq-answer px-5 text-xs sm:text-sm text-[#133E1A]/75 leading-relaxed">
+              Browse daily menus, choose your preferred lunch or dinner options, and place your order through the Hungrily Foods app. Homestyle meals are prepared fresh in trusted local kitchens and delivered directly to your doorstep.
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-[#133E1A]/10 shadow-sm overflow-hidden">
+            <button onclick="toggleFaq('faq-2')" class="w-full p-5 text-left flex items-center justify-between gap-4 font-serif text-lg font-bold text-[#133E1A] hover:text-[#FF6B00] transition-colors cursor-pointer">
+              <span>What are the order cut-off times for Lunch & Dinner?</span>
+              <i id="faq-2-icon" data-lucide="chevron-down" class="w-5 h-5 text-[#FF6B00] transition-transform"></i>
+            </button>
+            <div id="faq-2" class="faq-answer px-5 text-xs sm:text-sm text-[#133E1A]/75 leading-relaxed">
+              Lunch orders must be placed before <strong>9:00 AM</strong> for delivery after 12:00 PM. Dinner orders must be placed before <strong>4:00 PM</strong> for delivery after 7:00 PM.
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-[#133E1A]/10 shadow-sm overflow-hidden">
+            <button onclick="toggleFaq('faq-3')" class="w-full p-5 text-left flex items-center justify-between gap-4 font-serif text-lg font-bold text-[#133E1A] hover:text-[#FF6B00] transition-colors cursor-pointer">
+              <span>Are Veg and Non-Veg meals prepared separately?</span>
+              <i id="faq-3-icon" data-lucide="chevron-down" class="w-5 h-5 text-[#FF6B00] transition-transform"></i>
+            </button>
+            <div id="faq-3" class="faq-answer px-5 text-xs sm:text-sm text-[#133E1A]/75 leading-relaxed">
+              Yes, 100%. We partner with certified kitchens that maintain strict culinary separation. Vegetarian and Non-Vegetarian items are prepared in dedicated sections with separate cooking vessels.
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl border border-[#133E1A]/10 shadow-sm overflow-hidden">
+            <button onclick="toggleFaq('faq-4')" class="w-full p-5 text-left flex items-center justify-between gap-4 font-serif text-lg font-bold text-[#133E1A] hover:text-[#FF6B00] transition-colors cursor-pointer">
+              <span>How do I track my food delivery?</span>
+              <i id="faq-4-icon" data-lucide="chevron-down" class="w-5 h-5 text-[#FF6B00] transition-transform"></i>
+            </button>
+            <div id="faq-4" class="faq-answer px-5 text-xs sm:text-sm text-[#133E1A]/75 leading-relaxed">
+              Every order includes real-time live GPS tracking on the Hungrily Foods app so you can follow your delivery executive bringing hot meals straight to your door.
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- CONTACT & TIFFIN INQUIRY -->
+    <section id="contact" class="py-8 sm:py-10 bg-[#FAF4EB] border-t border-[#133E1A]/10">
+      <div class="max-w-[1280px] mx-auto px-6 lg:px-12">
+        
+        <div class="text-center max-w-[680px] mx-auto mb-10">
+          <div class="inline-flex items-center gap-2 px-4 py-2 bg-[#133E1A]/5 border border-[#133E1A]/15 rounded-full text-xs font-bold text-[#133E1A] uppercase mb-3">
+            <i data-lucide="phone" class="w-4 h-4 text-[#FF6B00]"></i>
+            <span>TIFFIN SUPPORT DESK</span>
+          </div>
+          <h2 class="font-serif text-3xl sm:text-4xl lg:text-5xl font-extrabold text-[#133E1A] mb-3">
+            Contact <span class="text-[#FF6B00]">Tiffin Team</span>
+          </h2>
+          <p class="text-base text-[#133E1A]/70 leading-relaxed">
+            Have questions about daily tiffin subscriptions, corporate office meal plans, or trial orders? Contact our team!
+          </p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-10">
+          
+          <div class="lg:col-span-5 flex flex-col justify-between">
+            <div class="space-y-6">
+              <h3 class="font-serif text-2xl font-extrabold text-[#133E1A]">Hungrily Tiffin Desk</h3>
+              
+              <div class="flex items-start gap-4">
+                <div class="w-11 h-11 rounded-full bg-[#FF6B00]/12 text-[#FF6B00] flex items-center justify-center shrink-0">
+                  <i data-lucide="phone" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <div class="font-extrabold text-[#133E1A] text-sm">Phone / Tiffin Helpline</div>
+                  <a href="tel:+918625018625" class="text-[#133E1A]/70 text-sm hover:text-[#FF6B00] transition-colors font-bold block no-underline">+91 02269 645772</a>
+                </div>
+              </div>
+
+              <div class="flex items-start gap-4">
+                <div class="w-11 h-11 rounded-full bg-[#133E1A]/10 text-[#133E1A] flex items-center justify-center shrink-0">
+                  <i data-lucide="mail" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <div class="font-extrabold text-[#133E1A] text-sm">Email Address</div>
+                  <div class="text-[#133E1A]/70 text-sm">info@hungrilyfoods.com</div>
+                </div>
+              </div>
+
+              <div class="flex items-start gap-4">
+                <div class="w-11 h-11 rounded-full bg-[#FF6B00]/12 text-[#FF6B00] flex items-center justify-center shrink-0">
+                  <i data-lucide="map-pin" class="w-5 h-5"></i>
+                </div>
+                <div>
+                  <div class="font-extrabold text-[#133E1A] text-sm">Central Kitchen Hub</div>
+                  <div class="text-[#133E1A]/70 text-sm leading-normal">Nagapur, Ahilya Nagar, Maharashtra, India</div>
+                </div>
+              </div>
+
+              <!-- Government Registrations & Compliance -->
+              <div class="mt-6 p-4 bg-white/90 rounded-2xl border border-[#133E1A]/12 shadow-xs space-y-2.5">
+                <div class="text-xs font-extrabold text-[#133E1A] tracking-wider uppercase mb-2 flex items-center gap-2">
+                  <i data-lucide="shield-check" class="w-4 h-4 text-[#00A651]"></i>
+                  <span>Government Registrations</span>
+                </div>
+                <div class="flex items-center justify-between text-xs py-1 border-b border-[#133E1A]/8">
+                  <span class="text-[#133E1A]/70 font-semibold">GST No:</span>
+                  <span class="font-mono font-bold text-[#133E1A] select-all">27BIVPK6902K1ZM</span>
+                </div>
+                <div class="flex items-center justify-between text-xs py-1 border-b border-[#133E1A]/8">
+                  <span class="text-[#133E1A]/70 font-semibold">Udyam Aadhar No:</span>
+                  <span class="font-mono font-bold text-[#133E1A] select-all">UDYAM-MH-01-0307749</span>
+                </div>
+                <div class="flex items-center justify-between text-xs py-1">
+                  <span class="text-[#133E1A]/70 font-semibold">Food License (FSSAI):</span>
+                  <span class="font-mono font-bold text-[#00A651] select-all">101698851930</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-8">
+              <div class="text-xs font-extrabold text-[#133E1A] tracking-widest uppercase mb-3">FOLLOW OUR TIFFIN KITCHEN</div>
+              <div class="flex gap-3">
+                <a href="#contact" class="w-10 h-10 rounded-full bg-white border border-[#133E1A]/12 text-[#133E1A] flex items-center justify-center hover:bg-[#FF6B00] hover:text-white hover:border-[#FF6B00] transition-colors" aria-label="Social Share">
+                  <i data-lucide="share-2" class="w-4 h-4"></i>
+                </a>
+                <a href="#contact" class="w-10 h-10 rounded-full bg-white border border-[#133E1A]/12 text-[#133E1A] flex items-center justify-center hover:bg-[#FF6B00] hover:text-white hover:border-[#FF6B00] transition-colors" aria-label="Website Link">
+                  <i data-lucide="globe" class="w-4 h-4"></i>
+                </a>
+                <a href="#contact" class="w-10 h-10 rounded-full bg-white border border-[#133E1A]/12 text-[#133E1A] flex items-center justify-center hover:bg-[#FF6B00] hover:text-white hover:border-[#FF6B00] transition-colors" aria-label="Message Support">
+                  <i data-lucide="message-circle" class="w-4 h-4"></i>
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div class="lg:col-span-7 bg-white rounded-3xl p-8 sm:p-10 border border-[#133E1A]/8 shadow-md">
+            <h3 class="font-serif text-2xl font-extrabold text-[#133E1A] mb-2">Send Tiffin Inquiry</h3>
+            <p class="text-xs text-[#133E1A]/70 mb-6">Drop your details below and our tiffin team will contact you within 2 hours.</p>
+
+            <div id="contact-success" class="hidden bg-emerald-50 border-2 border-emerald-500 rounded-xl p-6 text-center mb-4">
+              <i data-lucide="check-circle-2" class="w-10 h-10 text-emerald-600 mx-auto mb-2"></i>
+              <h4 class="font-serif text-[#133E1A] text-lg font-extrabold">Inquiry Sent Successfully!</h4>
+              <p class="text-[#133E1A]/70 text-xs mt-1">Thank you for reaching out. We will call you shortly to assist with your Tiffin subscription!</p>
+            </div>
+
+            <form id="contact-form" onsubmit="handleContactSubmit(event)" class="flex flex-col gap-4">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-[#133E1A] mb-1">Your Name *</label>
+                  <input type="text" id="enquiry-name" required placeholder="e.g. Rahul Sharma" class="w-full px-4 py-3 rounded-xl border border-[#133E1A]/20 text-xs outline-none focus:border-[#FF6B00] transition-colors" />
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-[#133E1A] mb-1">Phone Number *</label>
+                  <input type="tel" id="enquiry-phone" required placeholder="+91 98765 00000" class="w-full px-4 py-3 rounded-xl border border-[#133E1A]/20 text-xs outline-none focus:border-[#FF6B00] transition-colors" />
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-[#133E1A] mb-1">State *</label>
+                  <select id="enquiry-state" required class="w-full px-4 py-3 rounded-xl border border-[#133E1A]/20 text-xs outline-none focus:border-[#FF6B00] transition-colors bg-white">
+                    <option value="">-- Select State --</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-[#133E1A] mb-1">District *</label>
+                  <select id="enquiry-district" required class="w-full px-4 py-3 rounded-xl border border-[#133E1A]/20 text-xs outline-none focus:border-[#FF6B00] transition-colors bg-white">
+                    <option value="">-- Select District --</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-[#133E1A] mb-1">Taluka *</label>
+                  <select id="enquiry-taluka" required class="w-full px-4 py-3 rounded-xl border border-[#133E1A]/20 text-xs outline-none focus:border-[#FF6B00] transition-colors bg-white">
+                    <option value="">-- Select Taluka --</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-[#133E1A] mb-1">Area / Locality *</label>
+                  <input type="text" id="enquiry-area" list="enquiry-area-list" required placeholder="e.g. Kothrud, Hinjawadi, Wakad..." class="w-full px-4 py-3 rounded-xl border border-[#133E1A]/20 text-xs outline-none focus:border-[#FF6B00] transition-colors" />
+                  <datalist id="enquiry-area-list"></datalist>
+                </div>
+              </div>
+
+              <button type="submit" id="enquiry-submit-btn" class="mt-2 inline-flex items-center justify-center gap-2 px-7 py-3.5 bg-[#FF6B00] text-white font-extrabold text-sm rounded-full shadow-md hover:bg-[#E05D00] transition-colors cursor-pointer">
+                <i data-lucide="send" class="w-4 h-4"></i>
+                <span id="enquiry-submit-text">Submit Tiffin Inquiry</span>
+              </button>
+            </form>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- FOOTER (MATCHING REFERENCE IMAGE 100%) -->
+  <footer class="relative bg-[#FAF4EB] text-[#133E1A] pt-0 pb-0 overflow-hidden">
+    
+    <!-- Top Smooth Orange Wave Divider (Exact Match to Screenshot) -->
+    <div class="w-full overflow-hidden leading-none z-10 relative bg-[#FAF4EB]">
+      <svg class="relative block w-full h-[45px] sm:h-[65px] lg:h-[85px]" viewBox="0 0 1200 120" preserveAspectRatio="none">
+        <path d="M0,0 Q 300,75 600,30 T 1200,50 L 1200,120 L 0,120 Z" fill="#FAF4EB"></path>
+        <path d="M0,5 Q 300,75 600,30 T 1200,50" fill="none" stroke="#FF6B00" stroke-width="4.5"></path>
+      </svg>
+    </div>
+
+    <!-- Main Footer Body Container -->
+    <div class="max-w-[1280px] mx-auto px-6 lg:px-12 pt-4 pb-14 relative z-10">
+      
+      <!-- Right Background Decorative Leaf Watermark Graphic (Matching Screenshot) -->
+      <div class="absolute right-0 bottom-6 w-72 h-72 opacity-15 pointer-events-none z-0 hidden lg:block">
+        <svg viewBox="0 0 200 250" fill="none" stroke="#133E1A" stroke-width="1.2">
+          <path d="M100 240 C 100 160, 140 80, 180 20 C 120 60, 40 100, 20 180" />
+          <path d="M100 200 C 120 170, 160 150, 180 140" />
+          <path d="M90 160 C 60 140, 30 130, 10 130" />
+          <path d="M105 120 C 130 90, 160 70, 175 60" />
+          <path d="M80 80 C 50 60, 30 50, 15 45" />
+        </svg>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10 items-start relative z-10">
+        
+        <!-- Column 1: Brand Info & Social Icons -->
+        <div class="lg:col-span-3 flex flex-col items-start">
+          <a href="#home" class="inline-block no-underline mb-3">
+            <img src="assets/hungrily-logo.png" alt="Hungrily Logo" class="w-32 h-32 sm:w-36 sm:h-36 rounded-full object-contain drop-shadow-sm mb-2" />
+          </a>
+          <p class="text-xs sm:text-sm font-semibold text-[#133E1A]/85 leading-relaxed mb-1">
+            Homestyle meals. Daily happiness.
+          </p>
+          <div class="text-[#FF6B00] font-extrabold text-xs sm:text-sm mb-4">
+            Meals on Wheels
+          </div>
+          
+          <!-- Social Icons Row (Dark Green Circle Buttons) -->
+          <div class="flex items-center gap-2.5">
+            <a href="https://www.facebook.com/p/Hungrily-Foods-61594923717195/" target="_blank" rel="noopener noreferrer" aria-label="Facebook" class="w-8 h-8 rounded-full bg-[#133E1A] text-white flex items-center justify-center hover:bg-[#FF6B00] transition-colors">
+              <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill-rule="evenodd" d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.46h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.89h-2.33v6.988C18.343 21.128 22 16.991 22 12z" clip-rule="evenodd" />
+              </svg>
+            </a>
+            <a href="https://www.instagram.com/hung_rilyfoods/" target="_blank" rel="noopener noreferrer" aria-label="Instagram" class="w-8 h-8 rounded-full bg-[#133E1A] text-white flex items-center justify-center hover:bg-[#FF6B00] transition-colors">
+              <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+                <path fill-rule="evenodd" d="M12.315 2c2.43 0 2.784.013 3.808.06 1.064.049 1.791.218 2.427.465a4.902 4.902 0 011.772 1.153 4.902 4.902 0 011.153 1.772c.247.636.416 1.363.465 2.427.048 1.067.06 1.407.06 4.123v.08c0 2.643-.012 2.987-.06 4.043-.049 1.064-.218 1.791-.465 2.427a4.902 4.902 0 01-1.153 1.772 4.902 4.902 0 01-1.772 1.153c-.636.247-1.363.416-2.427.465-1.067.048-1.407.06-4.123.06h-.08c-2.643 0-2.987-.012-4.043-.06-1.064-.049-1.791-.218-2.427-.465a4.902 4.902 0 01-1.772-1.153 4.902 4.902 0 01-1.153-1.772c-.247-.636-.416-1.363-.465-2.427-.047-1.024-.06-1.379-.06-3.808v-.63c0-2.43.013-2.784.06-3.808.049-1.064.218-1.791.465-2.427a4.902 4.902 0 011.153-1.772A4.902 4.902 0 015.45 2.525c.636-.247 1.363-.416 2.427-.465C8.901 2.013 9.256 2 11.685 2h.63zm-.081 1.802h-.468c-2.456 0-2.784.011-3.807.058-.975.045-1.504.207-1.857.344-.467.182-.8.398-1.15.748-.35.35-.566.683-.748 1.15-.137.353-.3.882-.344 1.857-.047 1.023-.058 1.351-.058 3.807v.468c0 2.456.011 2.784.058 3.807.045.975.207 1.504.344 1.857.182.466.399.8.748 1.15.35.35.683.566 1.15.748.353.137.882.3 1.857.344 1.054.048 1.37.058 4.041.058h.08c2.597 0 2.917-.01 3.96-.058.976-.045 1.505-.207 1.858-.344.466-.182.8-.398 1.15-.748.35-.35.566-.683.748-1.15.137-.353.3-.882.344-1.857.048-1.055.058-1.37.058-4.041v-.08c0-2.597-.01-2.917-.058-3.96-.045-.976-.207-1.505-.344-1.858a3.097 3.097 0 00-.748-1.15 3.098 3.098 0 00-1.15-.748c-.353-.137-.882-.3-1.857-.344-1.023-.047-1.351-.058-3.807-.058zM12 6.865a5.135 5.135 0 110 10.27 5.135 5.135 0 010-10.27zm0 1.802a3.333 3.333 0 100 6.666 3.333 3.333 0 000-6.666zm5.338-3.205a1.2 1.2 0 110 2.4 1.2 1.2 0 010-2.4z" clip-rule="evenodd" />
+              </svg>
+            </a>
+          </div>
+        </div>
+
+        <!-- Column 2: Quick Links -->
+        <div class="lg:col-span-3">
+          <h4 class="font-serif text-base sm:text-lg font-extrabold text-[#133E1A] mb-4">Quick Links</h4>
+          <ul class="space-y-2 list-none p-0 text-xs sm:text-sm font-semibold text-[#133E1A]/80">
+            <li><a href="#home" class="hover:text-[#FF6B00] transition-colors no-underline">Home</a></li>
+            <li><a href="#tiffin-plans" class="hover:text-[#FF6B00] transition-colors no-underline">Tiffin Plans</a></li>
+            <li><a href="#weekly-menu" class="hover:text-[#FF6B00] transition-colors no-underline">Weekly Menu</a></li>
+            <li><a href="#how-it-works" class="hover:text-[#FF6B00] transition-colors no-underline">How It Works</a></li>
+            <li><a href="vendor.html" class="text-[#FF6B00] font-bold hover:text-[#E05D00] transition-colors no-underline flex items-center gap-1.5"><i data-lucide="store" class="w-3.5 h-3.5"></i> Become a Vendor Partner</a></li>
+            <li><a href="#about-us" class="hover:text-[#FF6B00] transition-colors no-underline">About Us</a></li>
+            <li><a href="#contact" class="hover:text-[#FF6B00] transition-colors no-underline">Contact Us</a></li>
+            <li><a href="#faq" class="hover:text-[#FF6B00] transition-colors no-underline">FAQ</a></li>
+          </ul>
+        </div>
+
+        <!-- Column 3: Contact Us -->
+        <div class="lg:col-span-3">
+          <h4 class="font-serif text-base sm:text-lg font-extrabold text-[#133E1A] mb-4">Contact Us</h4>
+          <ul class="space-y-3 list-none p-0 text-xs sm:text-sm font-semibold text-[#133E1A]/85">
+            <li class="flex items-center gap-3">
+              <i data-lucide="phone" class="w-4.5 h-4.5 text-[#133E1A] shrink-0"></i>
+              <a href="tel:+918625018625" class="hover:text-[#FF6B00] transition-colors no-underline text-[#133E1A] font-bold">+91 02269 645772</a>
+            </li>
+            <li class="flex items-center gap-3">
+              <i data-lucide="mail" class="w-4.5 h-4.5 text-[#133E1A] shrink-0"></i>
+              <a href="mailto:info@hungrilyfoods.com" class="hover:text-[#FF6B00] transition-colors no-underline text-[#133E1A]">info@hungrilyfoods.com</a>
+            </li>
+            <li class="flex items-start gap-3">
+              <i data-lucide="map-pin" class="w-4.5 h-4.5 text-[#FF6B00] shrink-0 mt-0.5"></i>
+              <div>
+                <span class="block text-xs font-semibold text-[#133E1A]/70">Currently Started In:</span>
+                <span class="font-extrabold text-[#133E1A] text-sm">📍 Pune &amp; Ahilyanagar</span>
+                <div class="inline-flex items-center gap-1.5 mt-1 px-2.5 py-0.5 rounded-full bg-[#FF6B00]/12 text-[#FF6B00] text-[0.68rem] font-extrabold">
+                  <span class="w-1.5 h-1.5 rounded-full bg-[#FF6B00] animate-pulse"></span>
+                  <span>Other Cities In Progress</span>
+                </div>
+                <span class="block text-[0.70rem] text-[#133E1A]/60 font-medium mt-0.5">Maharashtra, India</span>
+              </div>
+            </li>
+            <li class="flex items-start gap-3">
+              <i data-lucide="clock" class="w-4.5 h-4.5 text-[#133E1A] shrink-0 mt-0.5"></i>
+              <span>Mon – Sat: 7:00 AM – 10:00 PM</span>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Column 4: Subscribe to Updates -->
+        <div class="lg:col-span-3">
+          <h4 class="font-serif text-base sm:text-lg font-extrabold text-[#133E1A] mb-2">Subscribe to Updates</h4>
+          <p class="text-xs sm:text-sm text-[#133E1A]/80 mb-5 leading-relaxed font-medium">
+            Get menu updates, offers and health tips straight to your inbox.
+          </p>
+
+          <!-- Input Box with Integrated Dark Green Send Button (Exact Match) -->
+          <form onsubmit="event.preventDefault(); alert('Thank you for subscribing!');" class="w-full max-w-[320px]">
+            <div class="flex items-center bg-white rounded-xl border border-[#133E1A]/20 p-1.5 shadow-sm focus-within:border-[#FF6B00] transition-colors">
+              <input type="email" required placeholder="Enter your email" class="w-full px-3 py-2 text-xs sm:text-sm text-[#133E1A] bg-transparent outline-none font-medium placeholder-[#133E1A]/40" />
+              <button type="submit" aria-label="Subscribe" class="w-9 h-9 rounded-lg bg-[#133E1A] text-white flex items-center justify-center hover:bg-[#FF6B00] transition-colors shrink-0 cursor-pointer">
+                <i data-lucide="send" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </form>
+        </div>
+
+      </div>
+
+      <!-- Government Registrations & Compliance Strip -->
+      <div class="mt-10 pt-6 border-t border-[#133E1A]/12 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="bg-white/80 rounded-2xl p-4 border border-[#133E1A]/10 shadow-xs flex items-center gap-3.5">
+          <div class="w-10 h-10 rounded-xl bg-[#FF6B00]/10 text-[#FF6B00] flex items-center justify-center shrink-0">
+            <i data-lucide="receipt" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="text-[0.70rem] font-bold uppercase tracking-wider text-[#133E1A]/60">GST Registration No.</div>
+            <div class="font-mono text-xs sm:text-sm font-extrabold text-[#133E1A] tracking-wide select-all">27BIVPK6902K1ZM</div>
+          </div>
+        </div>
+        <div class="bg-white/80 rounded-2xl p-4 border border-[#133E1A]/10 shadow-xs flex items-center gap-3.5">
+          <div class="w-10 h-10 rounded-xl bg-[#133E1A]/10 text-[#133E1A] flex items-center justify-center shrink-0">
+            <i data-lucide="award" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="text-[0.70rem] font-bold uppercase tracking-wider text-[#133E1A]/60">Udyam Aadhar (MSME)</div>
+            <div class="font-mono text-xs sm:text-sm font-extrabold text-[#133E1A] tracking-wide select-all">UDYAM-MH-01-0307749</div>
+          </div>
+        </div>
+        <div class="bg-white/80 rounded-2xl p-4 border border-[#133E1A]/10 shadow-xs flex items-center gap-3.5">
+          <div class="w-10 h-10 rounded-xl bg-[#00A651]/10 text-[#00A651] flex items-center justify-center shrink-0">
+            <i data-lucide="shield-check" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <div class="text-[0.70rem] font-bold uppercase tracking-wider text-[#133E1A]/60">Food License (FSSAI)</div>
+            <div class="font-mono text-xs sm:text-sm font-extrabold text-[#133E1A] tracking-wide select-all">101698851930</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Bottom Dark Green Bar -->
+    <div class="bg-[#0D2E13] text-white/90 py-4 border-t border-white/10 text-xs sm:text-sm font-medium">
+      <div class="max-w-[1280px] mx-auto px-6 lg:px-12 flex flex-col md:flex-row items-center justify-between gap-3 text-center md:text-left">
+        <div>
+          © 2025 Hungrily – Meals on Wheels. All rights reserved. <span class="hidden sm:inline">|</span> <span class="block sm:inline mt-1 sm:mt-0 font-semibold text-amber-200">Developed by zenqubesolutions</span>
+        </div>
+        <div class="flex items-center gap-6 flex-wrap justify-center font-semibold text-white/80">
+          <a href="privacy-policy.html" class="hover:text-white transition-colors no-underline">Privacy Policy</a>
+          <a href="terms-and-conditions.html" class="hover:text-white transition-colors no-underline">Terms & Conditions</a>
+          <a href="refund-policy.html" class="hover:text-white transition-colors no-underline">Refund Policy</a>
+          <a href="food-safety.html" class="hover:text-white transition-colors no-underline">Food Safety</a>
+        </div>
+      </div>
+    </div>
+
+  </footer>
+
+  <!-- TIFFIN SUBSCRIPTION MODAL -->
+  <div id="tiffin-modal" class="modal-overlay hidden-modal" onclick="closeTiffinModal()">
+    <div class="bg-[#FAF4EB] rounded-3xl max-w-[540px] w-full p-8 relative shadow-2xl border-2 border-[#FF6B00] max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+      <button onclick="closeTiffinModal()" class="absolute top-5 right-5 p-2 rounded-full bg-[#133E1A]/6 text-[#133E1A] hover:bg-[#133E1A]/15 transition-colors cursor-pointer">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="text-center mb-6">
+        <img src="assets/hungrily-logo.png" alt="Hungrily Logo" style="width: 56px; height: 56px;" class="rounded-full mx-auto mb-2 shadow object-contain bg-white p-0.5" />
+        <h3 class="font-serif text-2xl font-extrabold text-[#133E1A] leading-tight">Order / Subscribe Tiffin</h3>
+        <p id="tiffin-modal-plan-title" class="text-xs text-[#FF6B00] font-extrabold mt-1">Selected Plan: Standard Veg Tiffin</p>
+      </div>
+
+      <div id="tiffin-modal-success" class="hidden bg-emerald-50 border-2 border-emerald-500 rounded-xl p-5 text-center mb-4">
+        <i data-lucide="check-circle-2" class="w-10 h-10 text-emerald-600 mx-auto mb-2"></i>
+        <h4 class="font-serif text-[#133E1A] text-lg font-bold">Request Received!</h4>
+        <p class="text-xs text-[#133E1A]/70 mt-1">Our Tiffin desk will call you within 15 minutes to confirm your delivery address and schedule your first hot tiffin!</p>
+      </div>
+
+      <form id="tiffin-modal-form" onsubmit="handleTiffinModalSubmit(event)" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-[#133E1A] mb-1">Full Name *</label>
+          <input type="text" required placeholder="e.g. Rahul Sharma" class="w-full px-4 py-3 rounded-xl border border-[#133E1A]/20 text-xs outline-none focus:border-[#FF6B00]" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-[#133E1A] mb-1">Mobile Number *</label>
+          <input type="tel" required placeholder="+91 98765 00000" class="w-full px-4 py-3 rounded-xl border border-[#133E1A]/20 text-xs outline-none focus:border-[#FF6B00]" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-[#133E1A] mb-1">Subscription Type</label>
+            <select class="w-full px-3 py-2.5 rounded-xl border border-[#133E1A]/20 text-xs outline-none focus:border-[#FF6B00] bg-white">
+              <option>1-Day Trial Tiffin Box</option>
+              <option selected>Monthly (30 Days - Save 20%)</option>
+              <option>Weekly (7 Days Plan)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-[#133E1A] mb-1">Meal Preference</label>
+            <select class="w-full px-3 py-2.5 rounded-xl border border-[#133E1A]/20 text-xs outline-none focus:border-[#FF6B00] bg-white">
+              <option>Lunch (12:00 PM - 1:30 PM)</option>
+              <option>Dinner (7:30 PM - 9:00 PM)</option>
+              <option>Both Lunch & Dinner</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-[#133E1A] mb-1">Delivery Address *</label>
+          <textarea rows="2" required placeholder="Enter your full home or office address..." class="w-full px-4 py-2.5 rounded-xl border border-[#133E1A]/20 text-xs outline-none focus:border-[#FF6B00] resize-y"></textarea>
+        </div>
+
+        <button type="submit" class="w-full py-4 bg-[#FF6B00] text-white font-extrabold text-sm rounded-full shadow-md hover:bg-[#E05D00] transition-colors flex items-center justify-center gap-2 cursor-pointer">
+          <i data-lucide="check-circle" class="w-4 h-4"></i>
+          <span>Confirm Tiffin Booking</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT INTERACTIVE LOGIC -->
+  <script src="/admin/js/locations.js"></script>
+  <script>
+    lucide.createIcons();
+
+    // Live Production API Base Configuration
+    const LIVE_PROD_API_BASE = 'https://hungrilyfoods.com/api';
+
+    // Fetch live vendor & customer counts directly from the database
+    async function fetchPlatformStats() {
+      try {
+        // Live production API endpoint
+        const statsUrl = `${LIVE_PROD_API_BASE}/public/stats`;
+        const response = await fetch(statsUrl);
+        if (!response.ok) return;
+        const res = await response.json();
+        if (res && res.success && res.data) {
+          const custCount = res.data.customers_count;
+          const vendCount = res.data.vendors_count || res.data.hotels_count;
+          
+          const custEl = document.getElementById('stat-customers-count');
+          const vendEl = document.getElementById('stat-vendors-count');
+          
+          if (custEl && custCount !== undefined) {
+            animateCounter(custEl, custCount);
+          }
+          if (vendEl && vendCount !== undefined) {
+            animateCounter(vendEl, vendCount);
+          }
+        }
+      } catch (err) {
+        console.warn('Could not load live stats:', err);
+      }
+    }
+
+    function animateCounter(element, target) {
+      if (target <= 0) {
+        element.innerText = '0';
+        return;
+      }
+      let current = 0;
+      const step = Math.max(1, Math.ceil(target / 20));
+      const interval = setInterval(() => {
+        current += step;
+        if (current >= target) {
+          current = target;
+          clearInterval(interval);
+        }
+        element.innerText = current;
+      }, 35);
+    }
+
+    fetchPlatformStats();
+
+    // Tiffin Plan Cycle Switcher
+    function switchPlanCycle(cycle) {
+      const btnMonthly = document.getElementById('btn-monthly');
+      const btnWeekly = document.getElementById('btn-weekly');
+
+      if (cycle === 'monthly') {
+        btnMonthly.classList.add('bg-[#133E1A]', 'text-white', 'shadow');
+        btnMonthly.classList.remove('text-[#133E1A]/70');
+        btnWeekly.classList.remove('bg-[#133E1A]', 'text-white', 'shadow');
+        btnWeekly.classList.add('text-[#133E1A]/70');
+
+        document.querySelector('.plan-price-mini').innerText = '₹90';
+        document.querySelector('.plan-desc-mini').innerText = 'billed monthly (₹2,700 for 30 meals)';
+        document.querySelector('.plan-price-veg').innerText = '₹120';
+        document.querySelector('.plan-desc-veg').innerText = 'billed monthly (₹3,600 for 30 meals)';
+        document.querySelector('.plan-price-nonveg').innerText = '₹160';
+        document.querySelector('.plan-desc-nonveg').innerText = 'billed monthly (₹4,800 for 30 meals)';
+      } else {
+        btnWeekly.classList.add('bg-[#133E1A]', 'text-white', 'shadow');
+        btnWeekly.classList.remove('text-[#133E1A]/70');
+        btnMonthly.classList.remove('bg-[#133E1A]', 'text-white', 'shadow');
+        btnMonthly.classList.add('text-[#133E1A]/70');
+
+        document.querySelector('.plan-price-mini').innerText = '₹105';
+        document.querySelector('.plan-desc-mini').innerText = 'billed weekly (₹735 for 7 meals)';
+        document.querySelector('.plan-price-veg').innerText = '₹135';
+        document.querySelector('.plan-desc-veg').innerText = 'billed weekly (₹945 for 7 meals)';
+        document.querySelector('.plan-price-nonveg').innerText = '₹180';
+        document.querySelector('.plan-desc-nonveg').innerText = 'billed weekly (₹1,260 for 7 meals)';
+      }
+    }
+
+    // Weekly Menu Switcher
+    const menuDaysData = {
+      mon: { title: 'MONDAY TIFFIN SPECIAL', main: 'Paneer Kadai & Yellow Dal Tadka', desc: 'Fresh cottage cheese cooked in capsicum tomato gravy, served with 4 phulkas, yellow moong dal & basmati rice.', veg: 'Paneer Kadai • Aloo Bhindi • Moong Dal', nonveg: 'Chicken Curry • Egg Fry • Biryani', img: 'assets/veg_thali_3d.jpg' },
+      tue: { title: 'TUESDAY TIFFIN SPECIAL', main: 'Baingan Bharta & Chana Masala', desc: 'Smoky roasted eggplant bharta paired with rich spiced chickpeas gravy, tava rotis & jeera rice.', veg: 'Baingan Bharta • Chana Masala • Tava Roti', nonveg: 'Egg Curry • Chicken Korma • Steamed Rice', img: 'assets/chapati_bhaji_3d.jpg' },
+      wed: { title: 'WEDNESDAY TIFFIN SPECIAL', main: 'Aloo Gobi & Rajma Masala', desc: 'Comforting home-cooked Rajma gravy simmered in whole spices served with fried papad & rotis.', veg: 'Rajma Masala • Aloo Gobi Fry • Basmati Rice', nonveg: 'Chicken Sukka • Wheat Rotis • Mint Raita', img: 'assets/rice_dal_3d.jpg' },
+      thu: { title: 'THURSDAY TIFFIN SPECIAL', main: 'Paneer Butter Masala & Dal Makhani', desc: 'Creamy rich paneer gravy with slow-simmered dal makhani, butter phulkas & gulab jamun sweet.', veg: 'Paneer Butter Masala • Dal Makhani • Sweet', nonveg: 'Butter Chicken • Garlic Naan • Pulao', img: 'assets/special_meal_3d.jpg' },
+      fri: { title: 'FRIDAY TIFFIN SPECIAL', main: 'Bhindi Masala & Toor Dal Tadka', desc: 'Crispy bhindi fry paired with aromatic ghee-infused yellow dal tadka, steamed basmati rice & papad.', veg: 'Bhindi Masala Fry • Toor Dal • Jeera Rice', nonveg: 'Chicken Kolhapuri • Egg Gravy • Roti', img: 'assets/chicken_thali_3d.jpg' },
+      sat: { title: 'SATURDAY TIFFIN SPECIAL', main: 'Veg Kolhapuri & Matar Paneer', desc: 'Zesty spiced mixed veg gravy served with hot puffed wheat rotis, dal tadka & salad.', veg: 'Veg Kolhapuri • Matar Paneer • Tava Rotis', nonveg: 'Chicken Biryani Special • Raita • Salad', img: 'assets/hero_thali_3d.png' },
+      sun: { title: 'SUNDAY FEAST TIFFIN', main: 'Royal Sunday Special Thali', desc: 'Weekend gourmet treat with signature gravy, puris, jeera rice, fried papad, and sweet kheer.', veg: 'Paneer Special • Puri Bhaji • Kheer Sweet', nonveg: 'Chicken Biryani Feast • Egg Gravy • Sweet', img: 'assets/special_meal_3d.jpg' }
+    };
+
+    function switchMenuDay(dayKey) {
+      document.querySelectorAll('.menu-day-btn').forEach(btn => {
+        btn.classList.remove('bg-[#FF6B00]', 'text-white', 'shadow-sm');
+        btn.classList.add('bg-white', 'text-[#133E1A]', 'border-[#133E1A]/15');
+      });
+
+      const activeBtn = document.getElementById('day-' + dayKey);
+      if (activeBtn) {
+        activeBtn.classList.remove('bg-white', 'text-[#133E1A]', 'border-[#133E1A]/15');
+        activeBtn.classList.add('bg-[#FF6B00]', 'text-white', 'shadow-sm');
+      }
+
+      const data = menuDaysData[dayKey];
+      if (data) {
+        document.getElementById('menu-day-title').innerText = data.title;
+        document.getElementById('menu-main-heading').innerText = data.main;
+        document.getElementById('menu-main-desc').innerText = data.desc;
+        document.getElementById('menu-veg-items').innerText = data.veg;
+        document.getElementById('menu-nonveg-items').innerText = data.nonveg;
+        document.getElementById('menu-featured-img').src = data.img;
+      }
+    }
+
+    // FAQ Accordion
+    function toggleFaq(id) {
+      const content = document.getElementById(id);
+      const icon = document.getElementById(id + '-icon');
+      const isOpen = content.classList.contains('active');
+
+      document.querySelectorAll('.faq-answer').forEach(c => c.classList.remove('active'));
+      document.querySelectorAll('[id$="-icon"]').forEach(i => i.style.transform = 'rotate(0deg)');
+
+      if (!isOpen) {
+        content.classList.add('active');
+        icon.style.transform = 'rotate(180deg)';
+      }
+    }
+
+    // Navbar Scroll Shadow
+    window.addEventListener('scroll', function() {
+      const nav = document.getElementById('navbar');
+      if (window.scrollY > 20) {
+        nav.classList.add('bg-[#FAF4EB]/95', 'shadow-md');
+      } else {
+        nav.classList.remove('bg-[#FAF4EB]/95', 'shadow-md');
+      }
+    });
+
+    // Mobile Menu Toggle
+    function toggleMobileMenu() {
+      document.getElementById('mobile-drawer').classList.toggle('hidden');
+    }
+
+    // Tiffin Modal Handlers
+    function openTiffinModal(planName) {
+      document.getElementById('tiffin-modal-plan-title').innerText = 'Selected Plan: ' + planName;
+      document.getElementById('tiffin-modal').classList.remove('hidden-modal');
+      lucide.createIcons();
+    }
+
+    function closeTiffinModal() {
+      document.getElementById('tiffin-modal').classList.add('hidden-modal');
+    }
+
+    function handleTiffinModalSubmit(e) {
+      e.preventDefault();
+      document.getElementById('tiffin-modal-form').classList.add('hidden');
+      document.getElementById('tiffin-modal-success').classList.remove('hidden');
+      setTimeout(() => {
+        document.getElementById('tiffin-modal-form').classList.remove('hidden');
+        document.getElementById('tiffin-modal-success').classList.add('hidden');
+        document.getElementById('tiffin-modal-form').reset();
+        closeTiffinModal();
+      }, 3500);
+    }
+
+    // Contact / Enquiry Location Cascading & Form Submission
+    const FALLBACK_LOCATIONS = {
+      states: ['Maharashtra', 'Gujarat', 'Karnataka', 'Tamil Nadu', 'Delhi', 'Uttar Pradesh', 'Rajasthan', 'Madhya Pradesh'],
+      districts: {
+        'Maharashtra': ['Pune', 'Mumbai City', 'Mumbai Suburban', 'Thane', 'Nagpur', 'Nashik', 'Chhatrapati Sambhajinagar', 'Ahilyanagar', 'Kolhapur', 'Solapur', 'Satara', 'Sangli', 'Jalgaon', 'Amravati', 'Nanded', 'Latur', 'Dhule', 'Chandrapur', 'Raigad', 'Ratnagiri', 'Sindhudurg', 'Palghar'],
+        'Gujarat': ['Ahmedabad', 'Surat', 'Vadodara', 'Rajkot'],
+        'Karnataka': ['Bengaluru Urban', 'Mysuru', 'Mangaluru']
+      },
+      talukas: {
+        'Pune': ['Pune City', 'Haveli', 'Maval', 'Mulshi', 'Khed', 'Shirur', 'Baramati', 'Daund', 'Purandar', 'Bhor', 'Junnar', 'Ambegaon', 'Indapur', 'Velhe'],
+        'Mumbai City': ['Mumbai City'],
+        'Mumbai Suburban': ['Andheri', 'Borivali', 'Kurla'],
+        'Thane': ['Thane', 'Kalyan', 'Bhiwandi', 'Ulhasnagar', 'Ambernath', 'Shahapur'],
+        'Ahilyanagar': ['Ahilyanagar', 'Sangamner', 'Rahata', 'Kopargaon', 'Shrirampur', 'Nevasa', 'Parner'],
+        'Nashik': ['Nashik', 'Sinnar', 'Niphad', 'Malegaon', 'Igatpuri']
+      },
+      areas: {
+        'Pune': ['Kothrud', 'Hinjawadi', 'Wakad', 'Baner', 'Viman Nagar', 'Hadapsar', 'Kharadi', 'Shivaji Nagar', 'Aundh', 'Bavdhan', 'Pimple Saudagar', 'Magarpatta', 'Kalyani Nagar', 'Katraj', 'Dhanori', 'Ravet', 'Pashan', 'Vishrantwadi', 'Warje', 'Kondhwa'],
+        'Ahilyanagar': ['Savedi', 'MIDC', 'Station Road', 'Kotla', 'Bhingar', 'Pipeline Road', 'Tophkhana', 'Nagapur']
+      }
+    };
+
+    function initEnquiryLocationDropdowns() {
+      const stateEl = document.getElementById('enquiry-state');
+      const districtEl = document.getElementById('enquiry-district');
+      const talukaEl = document.getElementById('enquiry-taluka');
+      const areaListEl = document.getElementById('enquiry-area-list');
+
+      if (!stateEl || !districtEl || !talukaEl) return;
+
+      const locData = (typeof window !== 'undefined' && window.LOCATION_DATA) ? window.LOCATION_DATA : null;
+
+      // Populate States
+      const states = (locData && locData.statesByCountry && locData.statesByCountry['India']) 
+        ? locData.statesByCountry['India'] 
+        : FALLBACK_LOCATIONS.states;
+
+      stateEl.innerHTML = '<option value="">-- Select State --</option>' + 
+        states.map(s => `<option value="${s}" ${s === 'Maharashtra' ? 'selected' : ''}>${s}</option>`).join('');
+
+      function updateDistricts(selectedState = 'Maharashtra') {
+        const districts = (locData && locData.districtsByState && locData.districtsByState[selectedState])
+          ? locData.districtsByState[selectedState]
+          : (FALLBACK_LOCATIONS.districts[selectedState] || ['Pune', 'Mumbai Suburban', 'Thane']);
+
+        districtEl.innerHTML = '<option value="">-- Select District --</option>' +
+          districts.map(d => `<option value="${d}" ${d === 'Pune' ? 'selected' : ''}>${d}</option>`).join('');
+
+        updateTalukas(districtEl.value || districts[0] || 'Pune');
+      }
+
+      function updateTalukas(selectedDistrict = 'Pune') {
+        let talukas = (locData && locData.talukasByDistrict && locData.talukasByDistrict[selectedDistrict])
+          ? locData.talukasByDistrict[selectedDistrict]
+          : (FALLBACK_LOCATIONS.talukas[selectedDistrict] || [selectedDistrict]);
+
+        talukaEl.innerHTML = '<option value="">-- Select Taluka --</option>' +
+          talukas.map((t, idx) => `<option value="${t}" ${idx === 0 ? 'selected' : ''}>${t}</option>`).join('');
+
+        updateAreaSuggestions(selectedDistrict);
+      }
+
+      function updateAreaSuggestions(selectedDistrict = 'Pune') {
+        if (!areaListEl) return;
+        let areas = [];
+        if (locData && typeof locData.getAllAreas === 'function') {
+          areas = locData.getAllAreas(selectedDistrict);
+        }
+        if (!areas || areas.length === 0) {
+          areas = FALLBACK_LOCATIONS.areas[selectedDistrict] || [];
+        }
+        areaListEl.innerHTML = areas.map(a => `<option value="${a}">`).join('');
+      }
+
+      // Initial population
+      updateDistricts(stateEl.value || 'Maharashtra');
+
+      stateEl.addEventListener('change', function() {
+        updateDistricts(this.value);
+      });
+
+      districtEl.addEventListener('change', function() {
+        updateTalukas(this.value);
+      });
+    }
+
+    // Call on load
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initEnquiryLocationDropdowns);
+    } else {
+      initEnquiryLocationDropdowns();
+    }
+
+    // Contact / Enquiry Form Submit Handler
+    async function handleContactSubmit(e) {
+      e.preventDefault();
+      const form = document.getElementById('contact-form');
+      const successBox = document.getElementById('contact-success');
+      const submitBtn = document.getElementById('enquiry-submit-btn');
+      const submitText = document.getElementById('enquiry-submit-text');
+
+      const name = document.getElementById('enquiry-name').value.trim();
+      const phone = document.getElementById('enquiry-phone').value.trim();
+      const state = document.getElementById('enquiry-state').value.trim();
+      const district = document.getElementById('enquiry-district').value.trim();
+      const taluka = document.getElementById('enquiry-taluka').value.trim();
+      const area = document.getElementById('enquiry-area').value.trim();
+
+      if (!name || !phone || !state || !district || !taluka || !area) {
+        alert('Please fill all required fields before submitting.');
+        return;
+      }
+
+      // Button loading state
+      const originalText = submitText ? submitText.textContent : 'Submit Tiffin Inquiry';
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.75';
+      }
+      if (submitText) {
+        submitText.textContent = 'Submitting Inquiry...';
+      }
+
+      try {
+        const apiUrl = `${LIVE_PROD_API_BASE}/enquiries/submit`;
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            name,
+            phone,
+            state,
+            district,
+            taluka,
+            area
+          })
+        });
+
+        const result = await response.json().catch(() => ({}));
+
+        if (!response.ok || !result.success) {
+          throw new Error(result.message || 'Unable to submit enquiry. Please try again.');
+        }
+
+        // Show success state
+        form.classList.add('hidden');
+        successBox.classList.remove('hidden');
+
+        // Personalize confirmation message
+        const descEl = successBox.querySelector('p');
+        if (descEl) {
+          descEl.innerHTML = `Thank you, <strong>${name}</strong>! Your inquiry for <strong>${area}, ${taluka} (${district})</strong> has been saved. Our tiffin desk will contact you at <strong>${phone}</strong> shortly.`;
+        }
+        lucide.createIcons();
+
+        // Reset after 5 seconds
+        setTimeout(() => {
+          form.classList.remove('hidden');
+          successBox.classList.add('hidden');
+          form.reset();
+          initEnquiryLocationDropdowns();
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.style.opacity = '1';
+          }
+          if (submitText) {
+            submitText.textContent = originalText;
+          }
+        }, 5000);
+
+      } catch (err) {
+        alert('Could not submit enquiry: ' + err.message);
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.style.opacity = '1';
+        }
+        if (submitText) {
+          submitText.textContent = originalText;
+        }
+      }
+    }
+  </script>
+</body>
+</html>

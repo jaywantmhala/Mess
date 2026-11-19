@@ -40,6 +40,13 @@ if (!$driver || !password_verify($password, $driver['password'])) {
 
 unset($driver['password']);
 
+// Optional FCM Token update on login
+$fcmToken = trim($body['fcm_token'] ?? '');
+if (!empty($fcmToken)) {
+    $pdo->prepare("UPDATE drivers SET fcm_token = :fcm, updated_at = NOW() WHERE id = :id")
+        ->execute([':id' => $driver['id'], ':fcm' => $fcmToken]);
+}
+
 $token = JWT::generate([
     'sub'       => (int)$driver['id'],
     'email'     => $driver['email'],

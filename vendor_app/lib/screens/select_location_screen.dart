@@ -250,32 +250,66 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
                         autofocus: true,
                         onChanged: (val) {
                           if (_searchDebounce?.isActive ?? false) _searchDebounce!.cancel();
-                          _searchDebounce = Timer(const Duration(milliseconds: 600), () async {
+                          _searchDebounce = Timer(const Duration(milliseconds: 400), () async {
                             if (val.trim().isEmpty) {
                               setModalState(() => _suggestions = []);
                               return;
                             }
+                            List<Map<String, dynamic>> results = [];
                             try {
                               final url = Uri.parse(
                                 'https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${Uri.encodeComponent(val)}&key=$_googleApiKey&components=country:in',
                               );
-                              final response = await http.get(url);
+                              final response = await http.get(url).timeout(const Duration(seconds: 2));
                               if (response.statusCode == 200) {
                                 final data = jsonDecode(response.body) as Map<String, dynamic>;
                                 if (data['status'] == 'OK' && data['predictions'] != null) {
                                   final predictions = data['predictions'] as List;
-                                  setModalState(() {
-                                    _suggestions = predictions.map((pred) => {
-                                      'name': pred['structured_formatting']?['main_text'] ?? '',
-                                      'display_name': pred['description'] ?? '',
-                                      'place_id': pred['place_id'] ?? '',
-                                    }).toList();
-                                  });
+                                  results = predictions.map((pred) => {
+                                    'name': pred['structured_formatting']?['main_text'] ?? '',
+                                    'display_name': pred['description'] ?? '',
+                                    'place_id': pred['place_id'] ?? '',
+                                  }).toList();
                                 }
                               }
                             } catch (e) {
                               print('Google Autocomplete search error: $e');
                             }
+
+                            // Fallback to OpenStreetMap Nominatim if Google Places is slow, denied or empty
+                            if (results.isEmpty) {
+                              try {
+                                final nomUrl = Uri.parse(
+                                  'https://nominatim.openstreetmap.org/search?format=json&q=${Uri.encodeComponent(val)}&countrycodes=in&limit=8',
+                                );
+                                final nomRes = await http.get(nomUrl, headers: {
+                                  'User-Agent': 'HungrilyFoodsVendor/1.0',
+                                  'Accept-Language': 'en',
+                                }).timeout(const Duration(seconds: 3));
+
+                                if (nomRes.statusCode == 200) {
+                                  final nomList = jsonDecode(nomRes.body) as List;
+                                  results = nomList.map((item) {
+                                    final displayName = item['display_name'] as String? ?? '';
+                                    final parts = displayName.split(',');
+                                    final mainText = parts.isNotEmpty ? parts[0].trim() : displayName;
+                                    return {
+                                      'name': mainText,
+                                      'display_name': displayName,
+                                      'place_id': 'osm_${item['place_id'] ?? ''}',
+                                      'lat': double.tryParse(item['lat']?.toString() ?? '') ?? 0.0,
+                                      'lon': double.tryParse(item['lon']?.toString() ?? '') ?? 0.0,
+                                    };
+                                  }).toList();
+                                }
+                              } catch (e) {
+                                print('Nominatim search fallback error: $e');
+                              }
+                            }
+
+                            setModalState(() {
+                              _suggestions = results;
+                            });
                           });
                         },
                         decoration: InputDecoration(
@@ -388,7 +422,21 @@ class _SelectLocationScreenState extends State<SelectLocationScreen> {
   /// Triggered when user selects a search suggestion
   void _selectSuggestion(Map<String, dynamic> suggestion) {
     final placeId = suggestion['place_id'] as String? ?? '';
-    if (placeId.isNotEmpty) {
+    if (placeId.startsWith('osm_')) {
+      final lat = suggestion['lat'] as double? ?? 0.0;
+      final lon = suggestion['lon'] as double? ?? 0.0;
+      if (lat != 0.0 && lon != 0.0) {
+        final targetLatLng = LatLng(lat, lon);
+        setState(() {
+          _currentLocation = targetLatLng;
+          _suggestions = [];
+          _searchController.clear();
+          FocusScope.of(context).unfocus();
+        });
+        _mapController.move(targetLatLng, 18.0);
+        _reverseGeocode(lat, lon);
+      }
+    } else if (placeId.isNotEmpty) {
       _fetchPlaceDetails(placeId);
     }
   }

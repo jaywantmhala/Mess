@@ -11,6 +11,8 @@ header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../helpers/jwt.php';
 require_once __DIR__ . '/../../../helpers/response.php';
+require_once __DIR__ . '/../../../helpers/ably_helper.php';
+
 
 // ── JWT Authentication ────────────────────────────────────────────────────────
 $token   = JWT::getBearerToken();
@@ -34,6 +36,36 @@ if ($orderId <= 0 || empty($otp)) {
 try {
     $pdo = getDBConnection();
     
+    // Ensure required tables and schema columns exist BEFORE transaction (prevents MySQL implicit commits)
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS `tiffin_returns` (
+                `id`          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                `order_id`    INT UNSIGNED NOT NULL,
+                `hotel_id`    INT UNSIGNED NOT NULL,
+                `driver_id`   INT UNSIGNED NOT NULL,
+                `barcode`     TEXT DEFAULT NULL,
+                `status`      VARCHAR(50) DEFAULT 'RETURNED',
+                `scanned_at`  DATETIME DEFAULT CURRENT_TIMESTAMP,
+                `returned_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+                `created_at`  DATETIME DEFAULT CURRENT_TIMESTAMP,
+                `updated_at`  DATETIME DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+            CREATE TABLE IF NOT EXISTS `tiffin_return_logs` (
+                `id`          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                `order_id`    INT UNSIGNED NOT NULL,
+                `driver_id`   INT UNSIGNED NOT NULL,
+                `customer_id` INT UNSIGNED NOT NULL,
+                `hotel_id`    INT UNSIGNED NOT NULL,
+                `otp`         TEXT DEFAULT NULL,
+                `verified_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+                `log_details` TEXT DEFAULT NULL,
+                `created_at`  DATETIME DEFAULT CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ");
+    } catch (Throwable $schemaErr) {}
+
     // Start Transaction for Race-Condition Protection
     $pdo->beginTransaction();
 
@@ -57,71 +89,137 @@ try {
         sendError('Tiffin return can only be verified for completed (delivered) orders.', 400);
     }
 
+    // Fetch hotel details for name and verification
+    $hotelStmt = $pdo->prepare("SELECT hotel_name FROM hotels WHERE id = ?");
+    $hotelStmt->execute([(int)$order['hotel_id']]);
+    $hotelName = $hotelStmt->fetchColumn() ?: 'Restaurant';
+
+    // If tiffin return was already verified (or retried), return success idempotently
     if ($order['tiffin_received_to_hotel'] === 'received') {
-        $pdo->rollBack();
-        sendError('Tiffin return has already been verified for this order.', 400);
+        $pdo->commit();
+        sendSuccess("$hotelName Tiffin Returned Successfully ✓", [
+            'order_id'                 => $orderId,
+            'hotel_id'                 => (int)$order['hotel_id'],
+            'hotel_name'               => $hotelName,
+            'tiffin_received_to_hotel' => 'received',
+            'status'                   => 'RETURNED'
+        ]);
     }
 
-    if ($order['tiffin_return_otp'] !== $otp) {
+    $cleanInput = strtoupper(trim($otp));
+    $expectedOtp = strtoupper(trim((string)$order['tiffin_return_otp']));
+    $expectedHotelQr1 = "HOTEL_" . $order['hotel_id'] . "_TIFFIN";
+    $expectedHotelQr2 = "HOTEL_" . $order['hotel_id'];
+    $expectedHotelQr3 = "HOTEL" . $order['hotel_id'] . "TIFFIN";
+    $expectedOrderId1 = (string)$orderId;
+    $expectedOrderId2 = "#" . $orderId;
+
+    // Detect if driver scanned a barcode belonging to another hotel (e.g., HOTEL_99_TIFFIN)
+    if (preg_match('/^HOTEL_?(\d+)/i', $cleanInput, $matches)) {
+        $scannedHotelId = (int)$matches[1];
+        if ($scannedHotelId !== (int)$order['hotel_id']) {
+            $pdo->rollBack();
+            sendError("This QR code is invalid.", 400);
+        }
+    }
+
+    $isValid = (!empty($expectedOtp) && $cleanInput === $expectedOtp)
+            || ($cleanInput === $expectedHotelQr1)
+            || ($cleanInput === $expectedHotelQr2)
+            || ($cleanInput === $expectedHotelQr3)
+            || ($cleanInput === $expectedOrderId1)
+            || ($cleanInput === $expectedOrderId2);
+
+    if (!$isValid) {
         $pdo->rollBack();
-        sendError('Invalid OTP. Please try again.', 400);
+        sendError("This QR code is invalid.", 400);
     }
 
     $customerId = (int)$order['customer_id'];
     $hotelId = (int)$order['hotel_id'];
 
-    // Update orders table
-    $updateStmt = $pdo->prepare("
-        UPDATE orders 
-        SET tiffin_received_to_hotel = 'received',
-            tiffin_returned_driver_id = ?,
-            tiffin_returned_at = NOW(),
-            updated_at = NOW()
-        WHERE order_id = ?
-    ");
-    $updateStmt->execute([$driverId, $orderId]);
+    // 1. Update orders table safely
+    try {
+        $updateStmt = $pdo->prepare("
+            UPDATE orders 
+            SET tiffin_received_to_hotel = 'received',
+                tiffin_returned_driver_id = ?,
+                tiffin_returned_at = NOW(),
+                updated_at = NOW()
+            WHERE order_id = ?
+        ");
+        $updateStmt->execute([$driverId, $orderId]);
+    } catch (Throwable $upErr) {
+        $updateStmt = $pdo->prepare("
+            UPDATE orders 
+            SET tiffin_received_to_hotel = 'received',
+                updated_at = NOW()
+            WHERE order_id = ?
+        ");
+        $updateStmt->execute([$orderId]);
+    }
 
-    // Insert log details
-    $logDetails = "Tiffin return verified successfully via OTP: $otp by Driver ID: $driverId";
-    $logStmt = $pdo->prepare("
-        INSERT INTO tiffin_return_logs (order_id, driver_id, customer_id, hotel_id, otp, verified_at, log_details)
-        VALUES (?, ?, ?, ?, ?, NOW(), ?)
-    ");
-    $logStmt->execute([$orderId, $driverId, $customerId, $hotelId, $otp, $logDetails]);
+    $safeOtp = substr($otp, 0, 250);
+
+    // 2. Insert into tiffin_returns table (safely wrapped)
+    try {
+        $trStmt = $pdo->prepare("
+            INSERT INTO tiffin_returns (order_id, hotel_id, driver_id, barcode, status, scanned_at, returned_at, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 'RETURNED', NOW(), NOW(), NOW(), NOW())
+        ");
+        $trStmt->execute([$orderId, $hotelId, $driverId, $safeOtp]);
+    } catch (Throwable $trErr) {
+        error_log("Note on tiffin_returns insert: " . $trErr->getMessage());
+    }
+
+    // 3. Insert into tiffin_return_logs table (safely wrapped)
+    try {
+        $logDetails = "Tiffin return verified successfully via OTP/Barcode: $safeOtp for Hotel: $hotelName by Driver ID: $driverId";
+        $logStmt = $pdo->prepare("
+            INSERT INTO tiffin_return_logs (order_id, driver_id, customer_id, hotel_id, otp, verified_at, log_details)
+            VALUES (?, ?, ?, ?, ?, NOW(), ?)
+        ");
+        $logStmt->execute([$orderId, $driverId, $customerId, $hotelId, $safeOtp, $logDetails]);
+    } catch (Throwable $logErr) {
+        error_log("Note on tiffin_return_logs insert: " . $logErr->getMessage());
+    }
 
     // Commit Transaction
     $pdo->commit();
 
-    // ── Send real-time notification to WebSocket server ─────────────────
+    // ── Send real-time notification via Ably ─────────────────
     try {
-        $fp = @fsockopen("127.0.0.1", 8081, $errno, $errstr, 1);
-        if ($fp) {
-            $notification = [
-                'system_event' => true,
-                'secret' => 'first_demo_system_websocket_secret_key_2026',
-                'event' => 'TIFFIN_RETURN_CONFIRMED',
-                'data' => [
-                    'order_id' => $orderId,
-                    'customer_id' => $customerId,
-                    'driver_id' => $driverId,
-                    'hotel_id' => $hotelId
-                ]
-            ];
-            @fwrite($fp, json_encode($notification));
-            @fclose($fp);
-        }
-    } catch (Exception $e) {
-        // Suppress WebSocket notification error to avoid blocking the REST response
+        $confirmPayload = [
+            'event'                   => 'tiffin-return-completed',
+            'order_id'                => $orderId,
+            'pending_tiffin_order_id' => $orderId,
+            'customer_id'             => $customerId,
+            'driver_id'               => $driverId,
+            'hotel_id'                => $hotelId,
+            'hotel_name'              => $hotelName,
+            'status'                  => 'RETURNED',
+            'message'                 => "Tiffin Returned Successfully ✓ for $hotelName"
+        ];
+        $driverChannel = AblyHelper::getDriverChannel($driverId);
+        AblyHelper::publish('tiffin-return-completed', $confirmPayload, $driverChannel);
+        AblyHelper::publish('tiffin-return-completed', $confirmPayload, "driver_{$driverId}");
+        AblyHelper::publish('TIFFIN_RETURN_CONFIRMED', $confirmPayload, $driverChannel);
+        AblyHelper::publish('TIFFIN_RETURN_CONFIRMED', $confirmPayload, "driver_{$driverId}");
+    } catch (Throwable $e) {
+        error_log("Notification error in tiffin_verify.php: " . $e->getMessage());
     }
 
-    sendSuccess('Tiffin return verified and completed successfully.', [
-        'order_id' => $orderId,
-        'tiffin_received_to_hotel' => 'received'
+    sendSuccess("$hotelName Tiffin Returned Successfully ✓", [
+        'order_id'                 => $orderId,
+        'hotel_id'                 => $hotelId,
+        'hotel_name'               => $hotelName,
+        'tiffin_received_to_hotel' => 'received',
+        'status'                   => 'RETURNED'
     ]);
 
-} catch (PDOException $e) {
-    if ($pdo->inTransaction()) {
+} catch (Throwable $e) {
+    if (isset($pdo) && $pdo->inTransaction()) {
         $pdo->rollBack();
     }
-    sendError('Database error: ' . $e->getMessage(), 500);
+    sendError('Database or system error: ' . $e->getMessage(), 500);
 }

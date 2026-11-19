@@ -2,7 +2,7 @@
 /**
  * GET /api/hotels/nearby
  *
- * Fetches hotels within a 2 km radius of the customer's coordinates.
+ * Fetches nearby hotels within customer's radius based on GPS coordinates.
  * Query Parameters: latitude, longitude
  * Header: Authorization: Bearer <token>
  */
@@ -26,89 +26,117 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     sendError('Method not allowed. Use GET.', 405);
 }
 
-// ── JWT Authentication ────────────────────────────────────────────────────────
+// ── JWT Authentication (Optional for Public Website) ──────────────────────────
 $token   = JWT::getBearerToken();
 $payload = $token ? JWT::verify($token) : null;
-
-if (!$payload || !isset($payload['sub'])) {
-    sendError('Unauthorized. Please log in again.', 401);
-}
+$customerId = ($payload && isset($payload['sub'])) ? (int)$payload['sub'] : null;
+$hasSub = false;
 
 // ── Validate Query Parameters ──────────────────────────────────────────────────
-if (!isset($_GET['latitude']) || trim($_GET['latitude']) === '') {
-    sendError("Query parameter 'latitude' is required.", 422);
-}
-if (!isset($_GET['longitude']) || trim($_GET['longitude']) === '') {
-    sendError("Query parameter 'longitude' is required.", 422);
-}
+$latitude  = isset($_GET['latitude']) ? filter_var($_GET['latitude'], FILTER_VALIDATE_FLOAT) : false;
+$longitude = isset($_GET['longitude']) ? filter_var($_GET['longitude'], FILTER_VALIDATE_FLOAT) : false;
 
-$latitude  = filter_var($_GET['latitude'], FILTER_VALIDATE_FLOAT);
-$longitude = filter_var($_GET['longitude'], FILTER_VALIDATE_FLOAT);
-
+// Fallback to Pune coordinates if not provided or invalid
 if ($latitude === false || $latitude < -90.0 || $latitude > 90.0) {
-    sendError('Valid latitude between -90 and 90 is required.', 422);
+    $latitude = 18.5204;
 }
 if ($longitude === false || $longitude < -180.0 || $longitude > 180.0) {
-    sendError('Valid longitude between -180 and 180 is required.', 422);
+    $longitude = 73.8567;
 }
 
 // ── Fetch Hotels ──────────────────────────────────────────────────────────────
 try {
     $pdo = getDBConnection();
     
-    // Haversine formula calculation in SQL:
-    // Earth Radius = 6371 km
-    // We use LEAST & GREATEST to clamp the acos argument to [-1, 1] to prevent NaN values
-    $stmt = $pdo->prepare("
-        SELECT 
-            id,
-            hotel_name,
-            owner_name,
-            mobile_number,
-            email,
-            hotel_address,
-            latitude,
-            longitude,
-            place_id,
-            city,
-            area,
-            state,
-            country,
-            pincode,
-            landmark,
-            photo_url,
-            created_at,
-            (
-                6371 * acos(
-                    LEAST(1.0, GREATEST(-1.0,
-                        cos(radians(:lat1)) * cos(radians(latitude)) *
-                        cos(radians(longitude) - radians(:lng)) +
-                        sin(radians(:lat2)) * sin(radians(latitude))
-                    ))
-                )
-            ) AS distance
-        FROM hotels
-        ORDER BY distance ASC
-    ");
-    
-    $stmt->execute([
+    if ($customerId) {
+        // Check if customer has an active subscription
+        $subStmt = $pdo->prepare("
+            SELECT id FROM customer_subscriptions
+            WHERE customer_id = :customer_id AND status = 'ACTIVE' AND end_date >= CURDATE() AND remaining_deliveries > 0
+            ORDER BY id DESC
+            LIMIT 1
+        ");
+        $subStmt->execute([':customer_id' => $customerId]);
+        $activeSub = $subStmt->fetch(PDO::FETCH_ASSOC);
+        $hasSub = (bool)$activeSub;
+    }
+
+    $foodTypeParam = isset($_GET['food_type']) ? strtoupper(trim($_GET['food_type'])) : (isset($_GET['type']) ? strtoupper(trim($_GET['type'])) : '');
+
+    $whereConds = [];
+    $params = [
         ':lat1' => $latitude,
         ':lng'  => $longitude,
         ':lat2' => $latitude,
-    ]);
+    ];
+
+    if (!empty($foodTypeParam) && $foodTypeParam !== 'ALL') {
+        if ($foodTypeParam === 'VEG') {
+            $whereConds[] = "(COALESCE(h.food_type, 'BOTH') IN ('VEG', 'BOTH', ''))";
+        } else if ($foodTypeParam === 'NON-VEG' || $foodTypeParam === 'NON_VEG') {
+            $whereConds[] = "(COALESCE(h.food_type, 'BOTH') IN ('NON-VEG', 'NON_VEG', 'BOTH', ''))";
+        }
+    }
+
+    $whereClause = !empty($whereConds) ? 'WHERE ' . implode(' AND ', $whereConds) : '';
+
+    // Haversine formula calculation in SQL for distance calculation:
+    // Calculates distance in km from customer's coordinates
+    $stmt = $pdo->prepare("
+        SELECT 
+            h.id,
+            h.vendor_id,
+            h.hotel_name,
+            h.owner_name,
+            h.mobile_number,
+            h.email,
+            h.hotel_address,
+            h.latitude,
+            h.longitude,
+            h.place_id,
+            h.city,
+            h.area,
+            h.state,
+            h.country,
+            h.pincode,
+            h.landmark,
+            h.photo_url,
+            COALESCE(h.service_type, 'BOTH') AS service_type,
+            COALESCE(h.food_type, 'BOTH') AS food_type,
+            h.created_at,
+            v.is_online AS is_vendor_online,
+            (
+                6371 * acos(
+                    LEAST(1.0, GREATEST(-1.0,
+                        cos(radians(:lat1)) * cos(radians(h.latitude)) *
+                        cos(radians(h.longitude) - radians(:lng)) +
+                        sin(radians(:lat2)) * sin(radians(h.latitude))
+                    ))
+                )
+            ) AS distance
+        FROM hotels h
+        LEFT JOIN vendors v ON h.vendor_id = v.id
+        $whereClause
+        ORDER BY distance ASC
+    ");
+    
+    $stmt->execute($params);
     
     $hotels = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Format distance values to floats for precision
+    // Format distance and numbers
     foreach ($hotels as &$hotel) {
-        $hotel['distance'] = (float)$hotel['distance'];
+        $hotel['distance'] = round((float)$hotel['distance'], 2);
         $hotel['latitude'] = (float)$hotel['latitude'];
         $hotel['longitude'] = (float)$hotel['longitude'];
+        $hotel['is_vendor_online'] = (bool)$hotel['is_vendor_online'];
     }
     unset($hotel);
 
     sendSuccess('Nearby hotels retrieved.', [
+        'has_active_subscription' => $hasSub,
         'hotels' => $hotels,
+        'serviceable' => true
     ]);
 } catch (PDOException $e) {
     sendError('Database error: ' . $e->getMessage(), 500);

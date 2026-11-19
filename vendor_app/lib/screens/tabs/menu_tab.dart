@@ -79,18 +79,138 @@ class _MenuTabState extends State<MenuTab> {
     }
   }
 
+  bool _isMenuLocked(MenuItem item) {
+    final now = DateTime.now();
+    final todayStr = _formatDate(now);
+    final cmp = item.menuDate.compareTo(todayStr);
+    if (cmp < 0) {
+      return true; // Past dates are locked
+    }
+    if (cmp > 0) {
+      return false; // Future dates are editable
+    }
+    // Today's date
+    if (item.mealType.trim().toLowerCase() == 'lunch') {
+      return now.hour >= 16; // Lunch closed at 4:00 PM
+    }
+    return false; // Dinner active until midnight
+  }
+
+  Widget _buildMealTypeBadge(String mealType, {bool isLocked = false}) {
+    final isLunch = mealType.trim().toLowerCase() == 'lunch';
+    final bgColor = isLunch ? const Color(0xFFFFF7ED) : const Color(0xFFF5F3FF);
+    final borderColor = isLunch ? const Color(0xFFFFEDD5) : const Color(0xFFEDE9FE);
+    final textColor = isLunch ? const Color(0xFFC2410C) : const Color(0xFF6D28D9);
+    final icon = isLunch ? Icons.wb_sunny_rounded : Icons.nightlight_round;
+    final label = isLunch ? 'Lunch' : 'Dinner';
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: borderColor),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 12, color: textColor),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: textColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (isLocked) ...[
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.lock_rounded, size: 11, color: Color(0xFF64748B)),
+                SizedBox(width: 3),
+                Text(
+                  'Locked',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
   void _showAddOrEditFoodDialog({MenuItem? existingItem}) {
+    if (existingItem != null && _isMenuLocked(existingItem)) {
+      CustomToast.show(
+        context,
+        'This ${existingItem.mealType} menu cannot be edited because its meal time has passed.',
+        isError: true,
+      );
+      return;
+    }
+
     final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController(text: existingItem?.foodName);
     final descController = TextEditingController(text: existingItem?.description);
-    final priceController = TextEditingController(
-      text: existingItem != null ? existingItem.price.toStringAsFixed(0) : '',
-    );
     String selectedType = existingItem?.foodType ?? 'VEG';
     String selectedSpice = existingItem?.spiceLevel ?? 'NONE';
+    String selectedMealType = existingItem?.mealType ?? (DateTime.now().hour < 16 ? 'Lunch' : 'Dinner');
     bool isPopular = existingItem?.isPopular ?? false;
     bool isAvailable = existingItem?.isAvailable ?? true;
     
+    // Mandatory items controllers list
+    List<TextEditingController> mandatoryControllers = existingItem != null && existingItem.mandatoryItems.isNotEmpty
+        ? existingItem.mandatoryItems.map((s) => TextEditingController(text: s)).toList()
+        : [TextEditingController()];
+
+    // Dry Sabji (Sukhi Bhaji) & Gravy Sabji (Patal Bhaji) controllers
+    List<TextEditingController> drySabjiControllers = [];
+    List<TextEditingController> gravySabjiControllers = [];
+
+    if (existingItem != null && existingItem.optionalItems.isNotEmpty) {
+      for (var s in existingItem.optionalItems) {
+        if (s.startsWith('Sukhi Bhaji: ') || s.startsWith('Dry Sabji: ')) {
+          drySabjiControllers.add(TextEditingController(text: s.replaceFirst(RegExp(r'^(Sukhi Bhaji|Dry Sabji):\s*'), '')));
+        } else if (s.startsWith('Patal Bhaji: ') || s.startsWith('Gravy Sabji: ')) {
+          gravySabjiControllers.add(TextEditingController(text: s.replaceFirst(RegExp(r'^(Patal Bhaji|Gravy Sabji):\s*'), '')));
+        } else {
+          if (drySabjiControllers.length < 2) {
+            drySabjiControllers.add(TextEditingController(text: s));
+          } else {
+            gravySabjiControllers.add(TextEditingController(text: s));
+          }
+        }
+      }
+    }
+
+    if (drySabjiControllers.isEmpty) {
+      drySabjiControllers = [TextEditingController(), TextEditingController()];
+    }
+    if (gravySabjiControllers.isEmpty) {
+      gravySabjiControllers = [TextEditingController(), TextEditingController()];
+    }
+
     File? pickedImage;
     String? currentImageUrl = existingItem?.imageUrl;
     bool isSaving = false;
@@ -121,12 +241,8 @@ class _MenuTabState extends State<MenuTab> {
                     children: [
                       Center(
                         child: Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(2),
-                          ),
+                          width: 40, height: 4,
+                          decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
                         ),
                       ),
                       const SizedBox(height: 16),
@@ -142,76 +258,158 @@ class _MenuTabState extends State<MenuTab> {
                           onTap: () async {
                             final picked = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
                             if (picked != null) {
-                              setModalState(() {
-                                pickedImage = File(picked.path);
-                              });
+                              setModalState(() { pickedImage = File(picked.path); });
                             }
                           },
                           child: Container(
-                            width: 120,
-                            height: 120,
+                            width: 120, height: 120,
                             decoration: BoxDecoration(
                               color: const Color(0xFFF1F5F9),
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(color: const Color(0xFFE2E8F0)),
                             ),
                             child: pickedImage != null
-                                ? ClipRRect(
-                                    borderRadius: BorderRadius.circular(16),
-                                    child: Image.file(pickedImage!, fit: BoxFit.cover),
-                                  )
+                                ? ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.file(pickedImage!, fit: BoxFit.cover))
                                 : (currentImageUrl != null
-                                    ? ClipRRect(
-                                        borderRadius: BorderRadius.circular(16),
-                                        child: Image.network(currentImageUrl, fit: BoxFit.cover),
-                                      )
-                                    : const Center(
-                                        child: Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Icon(Icons.add_a_photo_rounded, color: Color(0xFF94A3B8), size: 32),
-                                            SizedBox(height: 4),
-                                            Text('Add Photo', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                                          ],
-                                        ),
-                                      )),
+                                    ? ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.network(currentImageUrl, fit: BoxFit.cover))
+                                    : const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                                        Icon(Icons.add_a_photo_rounded, color: Color(0xFF94A3B8), size: 32),
+                                        SizedBox(height: 4),
+                                        Text('Add Photo', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                                      ]))),
                           ),
                         ),
                       ),
                       const SizedBox(height: 20),
 
-                      // Food Name input
-                      const Text('Dish Name *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                      // ── MEAL SESSION SELECTOR (LUNCH / DINNER) ──────────────
+                      Row(
+                        children: [
+                          const Text(
+                            'Meal Timing / Session *',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                          ),
+                          if (existingItem != null) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.lock_rounded, size: 10, color: Color(0xFF64748B)),
+                                  SizedBox(width: 3),
+                                  Text(
+                                    'Fixed once added',
+                                    style: TextStyle(fontSize: 10, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: existingItem == null
+                                  ? () => setModalState(() => selectedMealType = 'Lunch')
+                                  : null,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: selectedMealType == 'Lunch'
+                                      ? const Color(0xFFFFF7ED)
+                                      : const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: selectedMealType == 'Lunch'
+                                        ? const Color(0xFFEA580C)
+                                        : const Color(0xFFE2E8F0),
+                                    width: selectedMealType == 'Lunch' ? 1.8 : 1.0,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Text('🍛', style: TextStyle(fontSize: 16)),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Lunch',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: selectedMealType == 'Lunch' ? FontWeight.w700 : FontWeight.w500,
+                                        color: selectedMealType == 'Lunch'
+                                            ? const Color(0xFFEA580C)
+                                            : const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: existingItem == null
+                                  ? () => setModalState(() => selectedMealType = 'Dinner')
+                                  : null,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: selectedMealType == 'Dinner'
+                                      ? const Color(0xFFEEF2FF)
+                                      : const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: selectedMealType == 'Dinner'
+                                        ? const Color(0xFF4F46E5)
+                                        : const Color(0xFFE2E8F0),
+                                    width: selectedMealType == 'Dinner' ? 1.8 : 1.0,
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Text('🌙', style: TextStyle(fontSize: 16)),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      'Dinner',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: selectedMealType == 'Dinner' ? FontWeight.w700 : FontWeight.w500,
+                                        color: selectedMealType == 'Dinner'
+                                            ? const Color(0xFF4F46E5)
+                                            : const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // Dish Name input
+                      const Text('Dish / Menu Name *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 6),
                       TextFormField(
                         controller: nameController,
                         decoration: InputDecoration(
-                          hintText: 'e.g. Paneer Tikka, Chicken Biryani',
+                          hintText: 'e.g. Special Veg Thali, Deluxe Lunch',
                           hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                        validator: (v) => v == null || v.isEmpty ? 'Dish name is required' : null,
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Price input
-                      const Text('Price (₹) *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: priceController,
-                        keyboardType: TextInputType.number,
-                        decoration: InputDecoration(
-                          hintText: 'e.g. 220',
-                          hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        validator: (v) {
-                          if (v == null || v.isEmpty) return 'Price is required';
-                          if (double.tryParse(v) == null) return 'Enter a valid number';
-                          return null;
-                        },
+                        validator: (v) => v == null || v.trim().isEmpty ? 'Dish name is required' : null,
                       ),
                       const SizedBox(height: 16),
 
@@ -230,58 +428,297 @@ class _MenuTabState extends State<MenuTab> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Dropdown selection - Dietary Type
-                      const Text('Dietary Type *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 6),
-                      DropdownButtonFormField<String>(
-                        value: selectedType,
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        items: const [
-                          DropdownMenuItem(value: 'VEG', child: Text('Veg (Vegetarian)')),
-                          DropdownMenuItem(value: 'NON-VEG', child: Text('Non-Veg')),
+                      // Dropdown selection - Dietary Type & Spice Level
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Dietary Type *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 6),
+                                DropdownButtonFormField<String>(
+                                  value: selectedType,
+                                  decoration: InputDecoration(
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  items: const [
+                                    DropdownMenuItem(value: 'VEG', child: Text('Veg')),
+                                    DropdownMenuItem(value: 'NON-VEG', child: Text('Non-Veg')),
+                                  ],
+                                  onChanged: (val) { if (val != null) selectedType = val; },
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('Spice Level *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                                const SizedBox(height: 6),
+                                DropdownButtonFormField<String>(
+                                  value: selectedSpice,
+                                  decoration: InputDecoration(
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                  items: const [
+                                    DropdownMenuItem(value: 'NONE', child: Text('None')),
+                                    DropdownMenuItem(value: 'LOW', child: Text('Low')),
+                                    DropdownMenuItem(value: 'MEDIUM', child: Text('Medium')),
+                                    DropdownMenuItem(value: 'HIGH', child: Text('High')),
+                                  ],
+                                  onChanged: (val) { if (val != null) selectedSpice = val; },
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
-                        onChanged: (val) {
-                          if (val != null) selectedType = val;
-                        },
+                      ),
+                      const SizedBox(height: 20),
+
+                      // ── MANDATORY ITEMS SECTION ───────────────────────────
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF1F1),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFFCA5A5)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.check_circle_outline_rounded, color: Color(0xFFE23744), size: 20),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'Mandatory Items',
+                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFE23744)),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  'Included in meal',
+                                  style: TextStyle(fontSize: 11, color: Colors.red.shade700, fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            ...List.generate(mandatoryControllers.length, (index) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8.0),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: mandatoryControllers[index],
+                                        decoration: InputDecoration(
+                                          hintText: 'e.g. 4 Roti, Dal Fry, Jeera Rice',
+                                          hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 13),
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                          filled: true,
+                                          fillColor: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                    if (mandatoryControllers.length > 1)
+                                      IconButton(
+                                        icon: const Icon(Icons.remove_circle_outline_rounded, color: Colors.redAccent),
+                                        onPressed: () {
+                                          setModalState(() {
+                                            mandatoryControllers[index].dispose();
+                                            mandatoryControllers.removeAt(index);
+                                          });
+                                        },
+                                      ),
+                                  ],
+                                ),
+                              );
+                            }),
+                            InkWell(
+                              onTap: () {
+                                setModalState(() {
+                                  mandatoryControllers.add(TextEditingController());
+                                });
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 6.0),
+                                child: Row(
+                                  children: const [
+                                    Icon(Icons.add_circle_outline_rounded, color: Color(0xFFE23744), size: 18),
+                                    SizedBox(width: 6),
+                                    Text('+ Add Mandatory Item', style: TextStyle(color: Color(0xFFE23744), fontWeight: FontWeight.bold, fontSize: 13)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 16),
 
-                      // Dropdown selection - Spice Level
-                      const Text('Spice Level *', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 6),
-                      DropdownButtonFormField<String>(
-                        value: selectedSpice,
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      // ── OPTIONAL ITEMS SECTION ────────────────────────────
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFF93C5FD)),
                         ),
-                        items: const [
-                          DropdownMenuItem(value: 'NONE', child: Text('None (Not Spicy)')),
-                          DropdownMenuItem(value: 'LOW', child: Text('Low')),
-                          DropdownMenuItem(value: 'MEDIUM', child: Text('Medium')),
-                          DropdownMenuItem(value: 'HIGH', child: Text('High (Very Spicy)')),
-                        ],
-                        onChanged: (val) {
-                          if (val != null) selectedSpice = val;
-                        },
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.tune_rounded, color: Color(0xFF2563EB), size: 20),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'Optional Items (Sabji Choices)',
+                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF2563EB)),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  'Customer chooses optional',
+                                  style: TextStyle(fontSize: 11, color: Colors.blue.shade700, fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+
+                            // SUB-SECTION 1: Dry Sabji / Sukhi Bhaji
+                            const Text(
+                              'Dry Sabji / Sukhi Bhaji (Optional)',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                            ),
+                            const SizedBox(height: 6),
+                            ...List.generate(drySabjiControllers.length, (index) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8.0),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: drySabjiControllers[index],
+                                        decoration: InputDecoration(
+                                          hintText: index == 0 ? 'e.g. Aloo Bhendi / Dry Sabji 1' : 'e.g. Jeera Aloo / Dry Sabji 2',
+                                          labelText: 'Dry Sabji ${index + 1}',
+                                          labelStyle: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                          filled: true,
+                                          fillColor: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                    if (drySabjiControllers.length > 1)
+                                      IconButton(
+                                        icon: const Icon(Icons.remove_circle_outline_rounded, color: Colors.redAccent),
+                                        onPressed: () {
+                                          setModalState(() {
+                                            drySabjiControllers[index].dispose();
+                                            drySabjiControllers.removeAt(index);
+                                          });
+                                        },
+                                      ),
+                                  ],
+                                ),
+                              );
+                            }),
+                            InkWell(
+                              onTap: () {
+                                setModalState(() {
+                                  drySabjiControllers.add(TextEditingController());
+                                });
+                              },
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 4.0),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.add_circle_outline_rounded, color: Color(0xFF2563EB), size: 16),
+                                    SizedBox(width: 4),
+                                    Text('+ Add Dry Sabji Option', style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, fontSize: 12)),
+                                  ],
+                                ),
+                              ),
+                            ),
+
+                            const SizedBox(height: 14),
+                            const Divider(height: 1),
+                            const SizedBox(height: 12),
+
+                            // SUB-SECTION 2: Gravy Sabji / Patal Bhaji
+                            const Text(
+                              'Gravy Sabji / Patal Bhaji (Optional)',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                            ),
+                            const SizedBox(height: 6),
+                            ...List.generate(gravySabjiControllers.length, (index) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8.0),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: TextFormField(
+                                        controller: gravySabjiControllers[index],
+                                        decoration: InputDecoration(
+                                          hintText: index == 0 ? 'e.g. Shev Bhaji / Gravy Sabji 1' : 'e.g. Paneer Masala / Gravy Sabji 2',
+                                          labelText: 'Gravy Sabji ${index + 1}',
+                                          labelStyle: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                                          filled: true,
+                                          fillColor: Colors.white,
+                                        ),
+                                      ),
+                                    ),
+                                    if (gravySabjiControllers.length > 1)
+                                      IconButton(
+                                        icon: const Icon(Icons.remove_circle_outline_rounded, color: Colors.redAccent),
+                                        onPressed: () {
+                                          setModalState(() {
+                                            gravySabjiControllers[index].dispose();
+                                            gravySabjiControllers.removeAt(index);
+                                          });
+                                        },
+                                      ),
+                                  ],
+                                ),
+                              );
+                            }),
+                            InkWell(
+                              onTap: () {
+                                setModalState(() {
+                                  gravySabjiControllers.add(TextEditingController());
+                                });
+                              },
+                              child: const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 4.0),
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.add_circle_outline_rounded, color: Color(0xFF2563EB), size: 16),
+                                    SizedBox(width: 4),
+                                    Text('+ Add Gravy Sabji Option', style: TextStyle(color: Color(0xFF2563EB), fontWeight: FontWeight.bold, fontSize: 12)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 16),
 
                       // Popular status switch
                       SwitchListTile(
                         title: const Text('Mark as Popular (Highly Reordered)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                        subtitle: const Text('This will display the "Highly reordered" badge on the card', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                        subtitle: const Text('Displays "Highly reordered" badge', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
                         value: isPopular,
                         activeColor: const Color(0xFFF07070),
                         contentPadding: EdgeInsets.zero,
-                        onChanged: (val) {
-                          setModalState(() {
-                            isPopular = val;
-                          });
-                        },
+                        onChanged: (val) { setModalState(() { isPopular = val; }); },
                       ),
 
                       // Availability status switch
@@ -291,11 +728,7 @@ class _MenuTabState extends State<MenuTab> {
                         value: isAvailable,
                         activeColor: const Color(0xFF2563EB),
                         contentPadding: EdgeInsets.zero,
-                        onChanged: (val) {
-                          setModalState(() {
-                            isAvailable = val;
-                          });
-                        },
+                        onChanged: (val) { setModalState(() { isAvailable = val; }); },
                       ),
                       const SizedBox(height: 24),
 
@@ -304,72 +737,86 @@ class _MenuTabState extends State<MenuTab> {
                         width: double.infinity,
                         height: 52,
                         child: ElevatedButton(
-                          onPressed: isSaving
-                              ? null
-                              : () async {
-                                  if (!formKey.currentState!.validate()) return;
-                                  setModalState(() => isSaving = true);
-                                  
-                                  String? uploadedUrl = currentImageUrl;
-                                  if (pickedImage != null) {
-                                    uploadedUrl = await CloudinaryService.uploadImage(pickedImage!);
-                                  }
+                          onPressed: isSaving ? null : () async {
+                            if (!formKey.currentState!.validate()) return;
+                            setModalState(() => isSaving = true);
+                            
+                            String? uploadedUrl = currentImageUrl;
+                            if (pickedImage != null) {
+                              uploadedUrl = await CloudinaryService.uploadImage(pickedImage!);
+                            }
 
-                                  final MenuResult res;
-                                  final double parsedPrice = double.parse(priceController.text);
-                                  if (existingItem != null) {
-                                    res = await MenuService.instance.editMenuItem(
-                                      id: existingItem.id,
-                                      foodName: nameController.text,
-                                      description: descController.text,
-                                      foodType: selectedType,
-                                      price: parsedPrice,
-                                      spiceLevel: selectedSpice,
-                                      isPopular: isPopular,
-                                      isAvailable: isAvailable,
-                                      menuDate: _selectedDate,
-                                      imageUrl: uploadedUrl,
-                                    );
-                                  } else {
-                                    res = await MenuService.instance.addMenuItem(
-                                      hotelId: _selectedHotel!.id,
-                                      foodName: nameController.text,
-                                      description: descController.text,
-                                      foodType: selectedType,
-                                      price: parsedPrice,
-                                      spiceLevel: selectedSpice,
-                                      isPopular: isPopular,
-                                      isAvailable: isAvailable,
-                                      menuDate: _selectedDate,
-                                      imageUrl: uploadedUrl,
-                                    );
-                                  }
+                            final mandatoryList = mandatoryControllers
+                                .map((c) => c.text.trim())
+                                .where((s) => s.isNotEmpty)
+                                .toList();
 
-                                  if (res.success) {
-                                    SystemSound.play(SystemSoundType.alert);
-                                    if (context.mounted) {
-                                      Navigator.pop(context);
-                                      CustomToast.show(context, res.message);
-                                    }
-                                    _loadMenuItems();
-                                  } else {
-                                    setModalState(() => isSaving = false);
-                                    if (context.mounted) {
-                                      CustomToast.show(context, res.message, isError: true);
-                                    }
-                                  }
-                                },
+                            final List<String> optionalList = [];
+                            for (var c in drySabjiControllers) {
+                              final t = c.text.trim();
+                              if (t.isNotEmpty) optionalList.add('Sukhi Bhaji: $t');
+                            }
+                            for (var c in gravySabjiControllers) {
+                              final t = c.text.trim();
+                              if (t.isNotEmpty) optionalList.add('Patal Bhaji: $t');
+                            }
+
+                            final MenuResult res;
+                            if (existingItem != null) {
+                              res = await MenuService.instance.editMenuItem(
+                                id: existingItem.id,
+                                foodName: nameController.text,
+                                description: descController.text,
+                                foodType: selectedType,
+                                price: 0,
+                                spiceLevel: selectedSpice,
+                                isPopular: isPopular,
+                                isAvailable: isAvailable,
+                                menuDate: _selectedDate,
+                                mealType: existingItem.mealType,
+                                imageUrl: uploadedUrl,
+                                mandatoryItems: mandatoryList,
+                                optionalItems: optionalList,
+                              );
+                            } else {
+                              res = await MenuService.instance.addMenuItem(
+                                hotelId: _selectedHotel!.id,
+                                foodName: nameController.text,
+                                description: descController.text,
+                                foodType: selectedType,
+                                price: 0,
+                                spiceLevel: selectedSpice,
+                                isPopular: isPopular,
+                                isAvailable: isAvailable,
+                                menuDate: _selectedDate,
+                                mealType: selectedMealType,
+                                imageUrl: uploadedUrl,
+                                mandatoryItems: mandatoryList,
+                                optionalItems: optionalList,
+                              );
+                            }
+
+                            if (res.success) {
+                              SystemSound.play(SystemSoundType.alert);
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                                CustomToast.show(context, res.message);
+                              }
+                              _loadMenuItems();
+                            } else {
+                              setModalState(() => isSaving = false);
+                              if (context.mounted) {
+                                CustomToast.show(context, res.message, isError: true);
+                              }
+                            }
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFF07070),
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           child: isSaving
-                              ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                                )
+                              ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                               : Text(
                                   existingItem != null ? 'Save Changes' : 'Add to Menu',
                                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
@@ -389,16 +836,28 @@ class _MenuTabState extends State<MenuTab> {
   }
 
   Future<void> _toggleAvailability(MenuItem item) async {
+    if (_isMenuLocked(item)) {
+      if (mounted) {
+        CustomToast.show(
+          context,
+          'This ${item.mealType} menu is locked because its meal time has passed.',
+          isError: true,
+        );
+      }
+      return;
+    }
     final newAvailability = !item.isAvailable;
     final res = await MenuService.instance.editMenuItem(
       id: item.id,
       foodName: item.foodName,
       description: item.description,
       foodType: item.foodType,
-      price: item.price,
+      price: 0,
       spiceLevel: item.spiceLevel,
       isPopular: item.isPopular,
       isAvailable: newAvailability,
+      mandatoryItems: item.mandatoryItems,
+      optionalItems: item.optionalItems,
       menuDate: item.menuDate,
       imageUrl: item.imageUrl,
     );
@@ -462,9 +921,6 @@ class _MenuTabState extends State<MenuTab> {
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final isTablet = size.width > 600;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF9FBFC),
       appBar: AppBar(
@@ -539,17 +995,17 @@ class _MenuTabState extends State<MenuTab> {
                           child: Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFFFF1F1), // soft red
+                              color: const Color(0xFFFFF1F1),
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(color: const Color(0xFFFCA5A5), width: 1.5),
                             ),
-                            child: Row(
+                            child: const Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                const Icon(Icons.add_circle_outline_rounded, color: Color(0xFFE23744), size: 24),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'Add New Food Item',
+                                Icon(Icons.add_circle_outline_rounded, color: Color(0xFFE23744), size: 24),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Add New Food Item / Thali',
                                   style: TextStyle(
                                     color: Color(0xFFE23744),
                                     fontWeight: FontWeight.bold,
@@ -575,8 +1031,7 @@ class _MenuTabState extends State<MenuTab> {
                                   : ListView.builder(
                                       itemCount: _menuItems.length,
                                       itemBuilder: (context, index) {
-                                        final item = _menuItems[index];
-                                        return _buildZomatoFoodCard(item);
+                                        return _buildZomatoFoodCard(_menuItems[index]);
                                       },
                                     ),
                             ),
@@ -587,6 +1042,8 @@ class _MenuTabState extends State<MenuTab> {
             ),
     );
   }
+
+
 
   Widget _buildDateSlider() {
     return SizedBox(
@@ -657,6 +1114,7 @@ class _MenuTabState extends State<MenuTab> {
   }
 
   Widget _buildZomatoFoodCard(MenuItem item) {
+    final isLocked = _isMenuLocked(item);
     return Column(
       children: [
         Padding(
@@ -669,7 +1127,7 @@ class _MenuTabState extends State<MenuTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Veg/Non-Veg + Spice level indicator
+                    // Veg/Non-Veg + Spice level indicator + Meal Type badge
                     Row(
                       children: [
                         _buildVegIndicator(item.foodType),
@@ -677,6 +1135,8 @@ class _MenuTabState extends State<MenuTab> {
                           const SizedBox(width: 8),
                           _buildSpiceIndicator(item.spiceLevel),
                         ],
+                        const SizedBox(width: 8),
+                        _buildMealTypeBadge(item.mealType, isLocked: isLocked),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -716,15 +1176,33 @@ class _MenuTabState extends State<MenuTab> {
                       ),
                     ],
                     const SizedBox(height: 4),
-                    // Price
-                    Text(
-                      '₹${item.price.toStringAsFixed(0)}',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: Color(0xFF1E293B),
+                    // Mandatory Items List (e.g. Rice + Chapati + Dal)
+                    if (item.mandatoryItems.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        item.mandatoryItems.join(' + '),
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF1E293B),
+                          height: 1.3,
+                        ),
                       ),
-                    ),
+                    ],
+
+                    // Optional Items List (e.g. (Aloo Bhendi + Shev Bhaji))
+                    if (item.optionalItems.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        '(${item.optionalItems.map((s) => s.replaceAll(RegExp(r'^(Sukhi Bhaji|Dry Sabji|Patal Bhaji|Gravy Sabji):\s*', caseSensitive: false), '').trim()).where((s) => s.isNotEmpty).join(' + ')})',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF2563EB),
+                          height: 1.3,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     // Description
                     if (item.description.isNotEmpty)
@@ -846,29 +1324,65 @@ class _MenuTabState extends State<MenuTab> {
                             constraints: const BoxConstraints(),
                             onSelected: (val) {
                               if (val == 'edit') {
+                                if (isLocked) {
+                                  CustomToast.show(
+                                    context,
+                                    'This ${item.mealType} menu cannot be edited because its meal time has passed.',
+                                    isError: true,
+                                  );
+                                  return;
+                                }
                                 _showAddOrEditFoodDialog(existingItem: item);
                               } else if (val == 'delete') {
+                                if (isLocked) {
+                                  CustomToast.show(
+                                    context,
+                                    'This ${item.mealType} menu cannot be removed because its meal time has passed.',
+                                    isError: true,
+                                  );
+                                  return;
+                                }
                                 _confirmDeleteMenuItem(item);
                               }
                             },
                             itemBuilder: (context) => [
-                              const PopupMenuItem(
+                              PopupMenuItem(
                                 value: 'edit',
                                 child: Row(
                                   children: [
-                                    Icon(Icons.edit_rounded, color: Color(0xFF475569), size: 16),
-                                    SizedBox(width: 8),
-                                    Text('Edit Dish', style: TextStyle(fontSize: 13)),
+                                    Icon(
+                                      isLocked ? Icons.lock_outline_rounded : Icons.edit_rounded,
+                                      color: isLocked ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      isLocked ? 'Edit Dish (Locked)' : 'Edit Dish',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: isLocked ? const Color(0xFF94A3B8) : const Color(0xFF1E293B),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
-                              const PopupMenuItem(
+                              PopupMenuItem(
                                 value: 'delete',
                                 child: Row(
                                   children: [
-                                    Icon(Icons.delete_rounded, color: Colors.redAccent, size: 16),
-                                    SizedBox(width: 8),
-                                    Text('Remove Dish', style: TextStyle(fontSize: 13, color: Colors.redAccent)),
+                                    Icon(
+                                      Icons.delete_rounded,
+                                      color: isLocked ? const Color(0xFF94A3B8) : Colors.redAccent,
+                                      size: 16,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      isLocked ? 'Remove Dish (Locked)' : 'Remove Dish',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: isLocked ? const Color(0xFF94A3B8) : Colors.redAccent,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -979,7 +1493,7 @@ class _MenuTabState extends State<MenuTab> {
             ),
             const SizedBox(height: 8),
             Text(
-              'You need to register a hotel first before you can manage its daily food menus.',
+              'You need to register a mess first before you can manage its daily food menus.',
               style: TextStyle(color: Colors.grey[600], height: 1.4),
               textAlign: TextAlign.center,
             ),
@@ -995,7 +1509,7 @@ class _MenuTabState extends State<MenuTab> {
                 }
               },
               icon: const Icon(Icons.add_rounded, color: Colors.white),
-              label: const Text('Register Hotel', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              label: const Text('Register Mess', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFF07070),
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
@@ -1021,7 +1535,7 @@ class _MenuTabState extends State<MenuTab> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Tap "Add Food Item" below to create one.',
+            'Tap "+ Mandatory" or "+ Optional" to add items.',
             style: TextStyle(fontSize: 13, color: Colors.grey[400]),
           ),
         ],

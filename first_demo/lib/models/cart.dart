@@ -55,6 +55,12 @@ class CartSummary {
   final double deliveryFee;
   final double taxAmount;
   final double grandTotal;
+  final double tiffinCharge;
+  final double originalTiffinCharge;
+  final double discountPercentage;
+  final String? areaName;
+
+  bool get hasDiscount => originalTiffinCharge > tiffinCharge && originalTiffinCharge > 0;
 
   const CartSummary({
     required this.items,
@@ -64,6 +70,10 @@ class CartSummary {
     required this.deliveryFee,
     required this.taxAmount,
     required this.grandTotal,
+    this.tiffinCharge = 50.0,
+    this.originalTiffinCharge = 0.0,
+    this.discountPercentage = 0.0,
+    this.areaName,
   });
 
   bool get isEmpty => items.isEmpty;
@@ -72,6 +82,14 @@ class CartSummary {
     final itemsList = (json['items'] as List? ?? [])
         .map((i) => CartItem.fromJson(i as Map<String, dynamic>))
         .toList();
+    final tiffinVal = (double.tryParse((json['tiffin_charge'] ?? 50.0).toString()) ?? 0.0) > 0
+        ? (double.tryParse((json['tiffin_charge'] ?? 50.0).toString()) ?? 50.0)
+        : 50.0;
+    final origVal = double.tryParse((json['original_tiffin_charge'] ?? 0.0).toString()) ?? 0.0;
+    final discPct = (origVal > tiffinVal && origVal > 0)
+        ? (double.tryParse((json['discount_percentage'] ?? 0.0).toString()) ?? (((origVal - tiffinVal) / origVal) * 100))
+        : 0.0;
+
     return CartSummary(
       items: itemsList,
       hotel: json['hotel'] != null
@@ -82,6 +100,10 @@ class CartSummary {
       deliveryFee: double.parse((json['delivery_fee'] ?? 0).toString()),
       taxAmount: double.parse((json['tax_amount'] ?? 0).toString()),
       grandTotal: double.parse((json['grand_total'] ?? 0).toString()),
+      tiffinCharge: tiffinVal,
+      originalTiffinCharge: origVal,
+      discountPercentage: discPct,
+      areaName: json['area_name'] as String?,
     );
   }
 
@@ -92,5 +114,9 @@ class CartSummary {
         deliveryFee: 0,
         taxAmount: 0,
         grandTotal: 0,
+        tiffinCharge: 50.0,
+        originalTiffinCharge: 0.0,
+        discountPercentage: 0.0,
+        areaName: null,
       );
 }

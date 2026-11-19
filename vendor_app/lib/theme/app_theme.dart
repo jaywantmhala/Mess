@@ -1,21 +1,22 @@
 // lib/theme/app_theme.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 // ─── Brand Palette ────────────────────────────────────────────────────────────
 class AppColors {
   AppColors._();
 
-  // Primary — Zomato/Swiggy fire red
-  static const primary = Color(0xFFE23744);
-  static const primaryDeep = Color(0xFFC0392B);
-  static const primaryLight = Color(0xFFFF6B6B);
-  static const primarySurface = Color(0xFFFFF0F0);
+  // Primary — Hungrily brand orange
+  static const primary = Color(0xFFF58220);
+  static const primaryDeep = Color(0xFFD36F1B);
+  static const primaryLight = Color(0xFFFF9E4B);
+  static const primarySurface = Color(0xFFFFF7F0);
 
-  // Warm orange accent — Swiggy-inspired
-  static const accent = Color(0xFFFC8019);
-  static const accentDeep = Color(0xFFE5701A);
-  static const accentLight = Color(0xFFFFB347);
-  static const accentSurface = Color(0xFFFFF3E8);
+  // Accent — Hungrily brand green
+  static const accent = Color(0xFF006738);
+  static const accentDeep = Color(0xFF004D2A);
+  static const accentLight = Color(0xFF2E935A);
+  static const accentSurface = Color(0xFFE6F3EC);
 
   // Neutrals
   static const ink = Color(0xFF1C1C1E);
@@ -34,8 +35,8 @@ class AppColors {
   static const borderFocus = primary;
 
   // Status
-  static const success = Color(0xFF34C759);
-  static const successSurface = Color(0xFFEAFAF0);
+  static const success = Color(0xFF006738);
+  static const successSurface = Color(0xFFEAF5EF);
   static const error = Color(0xFFFF3B30);
   static const errorSurface = Color(0xFFFFF0EF);
   static const warning = Color(0xFFFF9500);
@@ -43,43 +44,43 @@ class AppColors {
 
   // ── Gradients ──────────────────────────────────────────────────────────────
 
-  /// Main brand gradient — Zomato deep red → coral
+  /// Main brand gradient — Hungrily orange gradient
   static const primaryGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFE23744), Color(0xFFC0392B)],
+    colors: [Color(0xFFF58220), Color(0xFFD36F1B)],
   );
 
-  /// Hero header gradient — rich crimson diagonal
+  /// Hero header gradient — vibrant orange diagonal
   static const heroGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
     stops: [0.0, 0.55, 1.0],
-    colors: [Color(0xFFFF4C5B), Color(0xFFE23744), Color(0xFFC0392B)],
+    colors: [Color(0xFFFF9E4B), Color(0xFFF58220), Color(0xFFD36F1B)],
   );
 
-  /// Orange accent gradient — Swiggy-inspired warm
+  /// Green accent gradient — Hungrily green gradient
   static const accentGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFFC8019), Color(0xFFE5701A)],
+    colors: [Color(0xFF006738), Color(0xFF004D2A)],
   );
 
-  /// Sunset — red → orange for hero banners
+  /// Sunset — orange → green
   static const sunsetGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFE23744), Color(0xFFFC8019)],
+    colors: [Color(0xFFF58220), Color(0xFF006738)],
   );
 
-  /// Card tint gradient (subtle, white overlay for card depth)
+  /// Card tint gradient
   static const cardGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFFFF6B6B), Color(0xFFE23744)],
+    colors: [Color(0xFFFF9E4B), Color(0xFFF58220)],
   );
 
-  /// Stats gradient — teal for revenue / insights
+  /// Stats gradient — teal
   static const statsGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
@@ -265,6 +266,12 @@ class AppTheme {
         useMaterial3: true,
         brightness: Brightness.light,
         scaffoldBackgroundColor: AppColors.surface,
+        pageTransitionsTheme: PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: const CupertinoPageTransitionsBuilder(),
+            TargetPlatform.iOS: const CupertinoPageTransitionsBuilder(),
+          },
+        ),
         colorScheme: const ColorScheme.light(
           primary: AppColors.primary,
           secondary: AppColors.accent,

@@ -6,28 +6,29 @@ import 'tabs/dashboard_tab.dart';
 import 'tabs/menu_tab.dart';
 import 'tabs/analytics_tab.dart';
 import 'tabs/profile_tab.dart';
-import '../services/websocket_service.dart';
+import '../services/ably_service.dart';
 import '../services/active_order_service.dart';
 import 'order_status_screen.dart';
 import '../models/order.dart';
+import '../services/order_notification_manager.dart';
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
-const _kCoralPrimary   = Color(0xFFF07070);
-const _kCoralDark      = Color(0xFFE05555);
-const _kBgPage         = Color(0xFFF9FAFB);
-const _kNavBg          = Color(0xFFFFFFFF);
-const _kInactiveIcon   = Color(0xFFB0B7C3);
-const _kInactiveLabel  = Color(0xFFB0B7C3);
-const _kNavBorder      = Color(0xFFEEF0F4);
+const _kCoralPrimary = Color(0xFFF07070);
+const _kCoralDark = Color(0xFFE05555);
+const _kBgPage = Color(0xFFF9FAFB);
+const _kNavBg = Color(0xFFFFFFFF);
+const _kInactiveIcon = Color(0xFFB0B7C3);
+const _kInactiveLabel = Color(0xFFB0B7C3);
+const _kNavBorder = Color(0xFFEEF0F4);
 
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
   @override
-  State<HomeShell> createState() => _HomeShellState();
+  State<HomeShell> createState() => HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell>
+class HomeShellState extends State<HomeShell>
     with SingleTickerProviderStateMixin {
   int _currentIndex = 0;
   late PageController _pageController;
@@ -44,10 +45,10 @@ class _HomeShellState extends State<HomeShell>
   bool _isShowingTiffinDialog = false;
 
   static const _navItems = [
-    _NavItem(icon: Icons.home_rounded,              label: 'Home'),
-    _NavItem(icon: Icons.assignment_return_rounded, label: 'Tiffin Return History'),
-    _NavItem(icon: Icons.receipt_long_rounded,      label: 'Ledger'),
-    _NavItem(icon: Icons.account_circle_rounded,    label: 'Profile'),
+    _NavItem(icon: Icons.home_rounded, label: 'Home'),
+    _NavItem(icon: Icons.history_rounded, label: 'History'),
+    _NavItem(icon: Icons.receipt_long_rounded, label: 'Ledger'),
+    _NavItem(icon: Icons.account_circle_rounded, label: 'Profile'),
   ];
 
   late final List<Widget> _tabs;
@@ -70,16 +71,29 @@ class _HomeShellState extends State<HomeShell>
     _entryCtrl.forward();
 
     // Establish WebSocket Connection
-    WebSocketService.instance.connect();
+    AblyService.instance.connect();
 
     // Listen for real-time WebSocket notifications
-    _wsSubscription = WebSocketService.instance.messages.listen((msg) {
+    _wsSubscription = AblyService.instance.messages.listen((msg) {
       final event = msg['event'] as String?;
       final data = msg['data'];
 
       if (event == 'ORDER_ASSIGNED') {
+        // Ignored on customer side (driver assignment popup is for assigned driver only)
+      } else if (event == 'ORDER_STATUS_UPDATED' ||
+          event == 'ORDER_ACCEPTED' ||
+          event == 'DRIVER_ACCEPTED') {
+        AblyService.instance.stopAlertSound();
+        if (_assignmentOverlay != null) {
+          _assignmentOverlay?.remove();
+          _assignmentOverlay = null;
+        }
         if (data != null && mounted) {
-          _showAssignmentOverlay(data);
+          final orderId = data['order_id'] as int?;
+          final status = data['status'] as String?;
+          if (orderId != null && status != null) {
+            // Disabled in-app custom overlay notification per request
+          }
         }
       } else if (event == 'PENDING_TIFFIN_RETURN') {
         if (data != null && mounted) {
@@ -96,18 +110,19 @@ class _HomeShellState extends State<HomeShell>
   @override
   void dispose() {
     _wsSubscription?.cancel();
-    WebSocketService.instance.stopAlertSound();
+    AblyService.instance.stopAlertSound();
+    OrderNotificationManager.instance.dismissNotification();
     _assignmentOverlay?.remove();
     _assignmentOverlay = null;
     _pageController.dispose();
     _entryCtrl.dispose();
-    WebSocketService.instance.disconnect();
+    AblyService.instance.disconnect();
     super.dispose();
   }
 
   void _showTiffinReturnPopup(dynamic data) {
     if (!mounted) return;
-    
+
     final previousOrderId = data['previous_order_id'] ?? 0;
     final hotelName = data['hotel_name']?.toString() ?? 'Restaurant';
     final otp = data['otp']?.toString() ?? '';
@@ -124,7 +139,8 @@ class _HomeShellState extends State<HomeShell>
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
         return WillPopScope(
-          onWillPop: () async => false, // Customer cannot dismiss until driver verifies
+          onWillPop: () async =>
+              false, // Customer cannot dismiss until driver verifies
           child: Dialog(
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(24),
@@ -166,16 +182,14 @@ class _HomeShellState extends State<HomeShell>
                     ),
                   ),
                   const SizedBox(height: 20),
-                  
+
                   // Details Container
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.04),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: Colors.white.withOpacity(0.08),
-                      ),
+                      border: Border.all(color: Colors.white.withOpacity(0.08)),
                     ),
                     child: Column(
                       children: [
@@ -184,11 +198,18 @@ class _HomeShellState extends State<HomeShell>
                           children: [
                             Text(
                               'Hotel:',
-                              style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.4),
+                                fontSize: 12,
+                              ),
                             ),
                             Text(
                               hotelName,
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
                             ),
                           ],
                         ),
@@ -198,11 +219,18 @@ class _HomeShellState extends State<HomeShell>
                           children: [
                             Text(
                               'Previous Order ID:',
-                              style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.4),
+                                fontSize: 12,
+                              ),
                             ),
                             Text(
                               '#$previousOrderId',
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
                             ),
                           ],
                         ),
@@ -210,7 +238,7 @@ class _HomeShellState extends State<HomeShell>
                     ),
                   ),
                   const SizedBox(height: 24),
-                  
+
                   // OTP Code Header
                   Text(
                     'SHARE THIS OTP WITH DRIVER',
@@ -222,10 +250,13 @@ class _HomeShellState extends State<HomeShell>
                     ),
                   ),
                   const SizedBox(height: 10),
-                  
+
                   // OTP Boxes
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFFE8614A).withOpacity(0.12),
                       borderRadius: BorderRadius.circular(16),
@@ -266,7 +297,7 @@ class _HomeShellState extends State<HomeShell>
     if (_isShowingTiffinDialog && mounted) {
       Navigator.of(context, rootNavigator: true).pop();
       _isShowingTiffinDialog = false;
-      
+
       // Show success SnackBar
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -295,7 +326,8 @@ class _HomeShellState extends State<HomeShell>
 
     final orderId = data['order_id'] ?? 0;
     final hotelName = data['hotel_name']?.toString() ?? 'Restaurant';
-    final grandTotal = double.tryParse(data['grand_total']?.toString() ?? '0') ?? 0.0;
+    final grandTotal =
+        double.tryParse(data['grand_total']?.toString() ?? '0') ?? 0.0;
 
     _assignmentOverlay = OverlayEntry(
       builder: (context) {
@@ -310,12 +342,12 @@ class _HomeShellState extends State<HomeShell>
               hotelName: hotelName,
               grandTotal: grandTotal,
               onDismiss: () {
-                WebSocketService.instance.stopAlertSound();
+                AblyService.instance.stopAlertSound();
                 _assignmentOverlay?.remove();
                 _assignmentOverlay = null;
               },
               onViewOrder: () {
-                WebSocketService.instance.stopAlertSound();
+                AblyService.instance.stopAlertSound();
                 _assignmentOverlay?.remove();
                 _assignmentOverlay = null;
                 _onTabTapped(0);
@@ -331,7 +363,7 @@ class _HomeShellState extends State<HomeShell>
 
     Timer(const Duration(seconds: 30), () {
       if (_assignmentOverlay != null) {
-        WebSocketService.instance.stopAlertSound();
+        AblyService.instance.stopAlertSound();
         _assignmentOverlay?.remove();
         _assignmentOverlay = null;
       }
@@ -343,41 +375,76 @@ class _HomeShellState extends State<HomeShell>
     // Light haptic feedback on tab change
     HapticFeedback.selectionClick();
     setState(() => _currentIndex = index);
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 380),
-      curve: Curves.easeOutCubic,
-    );
+    _pageController.jumpToPage(index);
   }
+
+  void selectTab(int index) {
+    _onTabTapped(index);
+  }
+
+  DateTime? _lastBackPressTime;
 
   @override
   Widget build(BuildContext context) {
     // Enforce light status bar icons (dark icons on light header)
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-    ));
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+      ),
+    );
 
-    return FadeTransition(
-      opacity: _entryFade,
-      child: Scaffold(
-        backgroundColor: _kBgPage,
-        extendBody: false,
-        body: Stack(
-          children: [
-            PageView(
-              controller: _pageController,
-              physics: const NeverScrollableScrollPhysics(),
-              onPageChanged: (i) => setState(() => _currentIndex = i),
-              children: _tabs,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final now = DateTime.now();
+        if (_lastBackPressTime == null ||
+            now.difference(_lastBackPressTime!) > const Duration(seconds: 2)) {
+          _lastBackPressTime = now;
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Press back again to exit',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              duration: const Duration(seconds: 2),
+              backgroundColor: const Color(0xFF1E293B),
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
             ),
-            _buildDraggableFloatingTracker(),
-          ],
-        ),
-        bottomNavigationBar: _LightBottomNav(
-          currentIndex: _currentIndex,
-          items: _navItems,
-          onTap: _onTabTapped,
+          );
+        } else {
+          SystemNavigator.pop();
+        }
+      },
+      child: FadeTransition(
+        opacity: _entryFade,
+        child: Scaffold(
+          backgroundColor: _kBgPage,
+          extendBody: false,
+          body: Stack(
+            children: [
+              PageView(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
+                onPageChanged: (i) => setState(() => _currentIndex = i),
+                children: _tabs,
+              ),
+              _buildDraggableFloatingTracker(),
+            ],
+          ),
+          bottomNavigationBar: _LightBottomNav(
+            currentIndex: _currentIndex,
+            items: _navItems,
+            onTap: _onTabTapped,
+          ),
         ),
       ),
     );
@@ -392,7 +459,7 @@ class _HomeShellState extends State<HomeShell>
         final mediaQuery = MediaQuery.of(context);
         final screenW = mediaQuery.size.width;
         final screenH = mediaQuery.size.height;
-        
+
         final double defaultX = screenW - 190.0;
         final double defaultY = screenH - 180.0;
 
@@ -408,8 +475,14 @@ class _HomeShellState extends State<HomeShell>
           child: GestureDetector(
             onPanUpdate: (details) {
               setState(() {
-                _dragX = (_dragX! + details.delta.dx).clamp(16.0, screenW - 190.0);
-                _dragY = (_dragY! + details.delta.dy).clamp(80.0, screenH - 180.0);
+                _dragX = (_dragX! + details.delta.dx).clamp(
+                  16.0,
+                  screenW - 190.0,
+                );
+                _dragY = (_dragY! + details.delta.dy).clamp(
+                  80.0,
+                  screenH - 180.0,
+                );
               });
             },
             onTap: () {
@@ -435,7 +508,10 @@ class _HomeShellState extends State<HomeShell>
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(22),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: const Color(0xFF1D2E4E).withOpacity(0.96),
                     borderRadius: BorderRadius.circular(22),
@@ -456,7 +532,11 @@ class _HomeShellState extends State<HomeShell>
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: const [
-                                Icon(Icons.radar, size: 10, color: Color(0xFFFFD700)),
+                                Icon(
+                                  Icons.radar,
+                                  size: 10,
+                                  color: Color(0xFFFFD700),
+                                ),
                                 SizedBox(width: 3),
                                 Text(
                                   'LIVE TRACKING',
@@ -538,16 +618,9 @@ class _HomeShellState extends State<HomeShell>
       decoration: BoxDecoration(
         color: color.withOpacity(0.18),
         shape: BoxShape.circle,
-        border: Border.all(
-          color: color.withOpacity(0.4),
-          width: 1,
-        ),
+        border: Border.all(color: color.withOpacity(0.4), width: 1),
       ),
-      child: Icon(
-        icon,
-        color: color,
-        size: 16,
-      ),
+      child: Icon(icon, color: color, size: 16),
     );
   }
 
@@ -586,9 +659,7 @@ class _LightBottomNav extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         color: _kNavBg,
-        border: Border(
-          top: BorderSide(color: _kNavBorder, width: 1.2),
-        ),
+        border: Border(top: BorderSide(color: _kNavBorder, width: 1.2)),
         boxShadow: [
           BoxShadow(
             color: Color(0x12000000),
@@ -600,7 +671,7 @@ class _LightBottomNav extends StatelessWidget {
       child: SafeArea(
         top: false,
         child: SizedBox(
-          height: 60 + (bottomInset > 0 ? 0 : 4),
+          height: 68 + (bottomInset > 0 ? 0 : 4),
           child: Row(
             children: List.generate(items.length, (i) {
               return Expanded(
@@ -750,9 +821,10 @@ class _DriverAssignmentOverlayContentState
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..repeat(reverse: true);
-    _pulseAnim = Tween<double>(begin: 0.85, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut),
-    );
+    _pulseAnim = Tween<double>(
+      begin: 0.85,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
   }
 
   @override
@@ -767,7 +839,10 @@ class _DriverAssignmentOverlayContentState
       decoration: BoxDecoration(
         color: const Color(0xFF0F1A2E),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFFFB300).withOpacity(0.7), width: 2),
+        border: Border.all(
+          color: const Color(0xFFFFB300).withOpacity(0.7),
+          width: 2,
+        ),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFFFFB300).withOpacity(0.25),
@@ -857,7 +932,8 @@ class _DriverAssignmentOverlayContentState
                     foregroundColor: Colors.white60,
                     side: const BorderSide(color: Colors.white24, width: 1.2),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   onPressed: widget.onDismiss,
@@ -876,7 +952,8 @@ class _DriverAssignmentOverlayContentState
                     foregroundColor: const Color(0xFF0F1A2E),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                   onPressed: widget.onViewOrder,

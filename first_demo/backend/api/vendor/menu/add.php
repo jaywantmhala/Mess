@@ -2,8 +2,8 @@
 /**
  * POST /api/vendor/menu/add
  *
- * Adds a new daily food menu item under a vendor's hotel.
- * Body: { hotel_id, food_name, description, food_type, menu_date, image_url }
+ * Adds a new daily food menu item with mandatory and optional items under a vendor's hotel.
+ * Body: { hotel_id, food_name, description, food_type, spice_level, is_popular, is_available, image_url, menu_date, mandatory_items: [], optional_items: [] }
  * Header: Authorization: Bearer <token>
  */
 
@@ -11,6 +11,7 @@ require_once __DIR__ . '/../../../config/database.php';
 require_once __DIR__ . '/../../../helpers/response.php';
 require_once __DIR__ . '/../../../helpers/validation.php';
 require_once __DIR__ . '/../../../helpers/jwt.php';
+require_once __DIR__ . '/../../../helpers/redis_helper.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -47,15 +48,48 @@ $imageUrl    = isset($body['image_url']) ? sanitize($body['image_url']) : null;
 $price       = isset($body['price']) ? (float)$body['price'] : 0.0;
 $spiceLevel  = isset($body['spice_level']) ? sanitize($body['spice_level']) : 'NONE';
 $isPopular   = isset($body['is_popular']) ? (int)$body['is_popular'] : 0;
-$isAvailable = isset($body['is_available']) ? (int)$body['is_available'] : 1;
+$isAvailable = isset($body['is_available']) ? (int)$body['is_available'] : 1;
+$rawMealType = isset($body['meal_type']) ? trim(sanitize($body['meal_type'])) : 'Lunch';
+$mealType    = (strcasecmp($rawMealType, 'Dinner') === 0) ? 'Dinner' : 'Lunch';
+
+// Parse mandatory_items and optional_items arrays
+$mandatoryItems = [];
+if (isset($body['mandatory_items']) && is_array($body['mandatory_items'])) {
+    foreach ($body['mandatory_items'] as $item) {
+        $clean = sanitize(is_array($item) ? ($item['name'] ?? '') : (string)$item);
+        if (!empty($clean)) {
+            $mandatoryItems[] = $clean;
+        }
+    }
+}
+
+$optionalItems = [];
+if (isset($body['optional_items']) && is_array($body['optional_items'])) {
+    foreach ($body['optional_items'] as $item) {
+        $clean = sanitize(is_array($item) ? ($item['name'] ?? '') : (string)$item);
+        if (!empty($clean)) {
+            $optionalItems[] = $clean;
+        }
+    }
+}
 
 if (empty($foodName)) { sendError('Food name is required.', 422); }
 if ($foodType !== 'VEG' && $foodType !== 'NON-VEG') {
     sendError('Food type must be either VEG or NON-VEG.', 422);
 }
-// Validate date format YYYY-MM-DD
 if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $menuDate)) {
     sendError('Invalid menu date format. Use YYYY-MM-DD.', 422);
+}
+
+// Time cutoff validation
+date_default_timezone_set('Asia/Kolkata');
+$todayStr = date('Y-m-d');
+$currentHour = (int)date('H');
+if ($menuDate < $todayStr) {
+    sendError('Cannot add menu for past dates.', 422);
+}
+if ($menuDate === $todayStr && $mealType === 'Lunch' && $currentHour >= 16) {
+    sendError('Lunch time for today has passed (ended at 04:00 PM). Please select Dinner or a future date.', 422);
 }
 
 // ── Database ──────────────────────────────────────────────────────────────────
@@ -71,31 +105,43 @@ if (!$stmt->fetch()) {
     sendError('Hotel listing not found or permission denied.', 404);
 }
 
-// Insert daily menu item
-$stmt = $pdo->prepare("
-    INSERT INTO menus (hotel_id, food_name, description, food_type, price, spice_level, is_popular, is_available, image_url, menu_date, created_at, updated_at)
-    VALUES (:hotel_id, :food_name, :description, :food_type, :price, :spice_level, :is_popular, :is_available, :image_url, :menu_date, NOW(), NOW())
+$mandatoryJson = json_encode(array_values($mandatoryItems), JSON_UNESCAPED_UNICODE);
+$optionalJson  = json_encode(array_values($optionalItems), JSON_UNESCAPED_UNICODE);
+
+$insertStmt = $pdo->prepare("
+    INSERT INTO menus (hotel_id, food_name, description, food_type, price, spice_level, is_popular, is_available, image_url, meal_type, menu_date, mandatory_items, optional_items, created_at, updated_at)
+    VALUES (:hotel_id, :food_name, :description, :food_type, :price, :spice_level, :is_popular, :is_available, :image_url, :meal_type, :menu_date, :mandatory_items, :optional_items, NOW(), NOW())
 ");
-$stmt->execute([
-    ':hotel_id'    => $hotelId,
-    ':food_name'   => $foodName,
-    ':description' => $description,
-    ':food_type'   => $foodType,
-    ':price'       => $price,
-    ':spice_level' => $spiceLevel,
-    ':is_popular'  => $isPopular,
-    ':is_available' => $isAvailable,
-    ':image_url'   => $imageUrl,
-    ':menu_date'   => $menuDate,
+
+$insertStmt->execute([
+    ':hotel_id'        => $hotelId,
+    ':food_name'       => $foodName,
+    ':description'     => $description,
+    ':food_type'       => $foodType,
+    ':price'           => $price,
+    ':spice_level'     => $spiceLevel,
+    ':is_popular'      => $isPopular,
+    ':is_available'    => $isAvailable,
+    ':image_url'       => $imageUrl,
+    ':meal_type'       => $mealType,
+    ':menu_date'       => $menuDate,
+    ':mandatory_items' => $mandatoryJson,
+    ':optional_items'  => $optionalJson,
 ]);
 
 $menuId = (int)$pdo->lastInsertId();
+$fetchStmt = $pdo->prepare("SELECT * FROM menus WHERE id = :id");
+$fetchStmt->execute([':id' => $menuId]);
+$insertedItem = $fetchStmt->fetch(PDO::FETCH_ASSOC);
 
-// Fetch the added menu item
-$stmt = $pdo->prepare("SELECT * FROM menus WHERE id = :id");
-$stmt->execute([':id' => $menuId]);
-$menuItem = $stmt->fetch();
+if ($insertedItem) {
+    $insertedItem['mandatory_items'] = json_decode($insertedItem['mandatory_items'] ?? '[]', true) ?: [];
+    $insertedItem['optional_items']  = json_decode($insertedItem['optional_items'] ?? '[]', true) ?: [];
+}
+
+// Invalidate Redis menu cache for this hotel
+RedisHelper::invalidateHotelMenu($hotelId, $menuDate);
 
 sendSuccess('Food item added to menu successfully.', [
-    'menu_item' => $menuItem,
+    'menu_item' => $insertedItem,
 ], 201);

@@ -50,11 +50,14 @@ try {
     $stmt = $pdo->prepare(
         "SELECT id, type, amount, description, balance_after, created_at
          FROM wallet_transactions
-         WHERE wallet_id = ?
+         WHERE wallet_id = :wallet_id
          ORDER BY created_at DESC
-         LIMIT ? OFFSET ?"
+         LIMIT :limit OFFSET :offset"
     );
-    $stmt->execute([$walletId, $limit, $offset]);
+    $stmt->bindValue(':wallet_id', $walletId, PDO::PARAM_INT);
+    $stmt->bindValue(':limit',     $limit,    PDO::PARAM_INT);
+    $stmt->bindValue(':offset',    $offset,   PDO::PARAM_INT);
+    $stmt->execute();
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $transactions = array_map(function ($row) {

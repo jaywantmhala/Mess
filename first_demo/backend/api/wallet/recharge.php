@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../../config/database.php';
 require_once __DIR__ . '/../../helpers/response.php';
 require_once __DIR__ . '/../../helpers/jwt.php';
+require_once __DIR__ . '/../../helpers/redis_helper.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -21,6 +22,13 @@ if (!isset($body['amount'])) { sendError('Amount is required.', 422); }
 $amount = (float) $body['amount'];
 if ($amount <= 0)     { sendError('Amount must be greater than 0.', 422); }
 if ($amount > 50000)  { sendError('Amount cannot exceed 50,000.', 422); }
+
+// Concurrency Control: Acquire atomic lock to prevent double-credit race condition
+$walletLockKey = "customer:{$customerId}:wallet";
+$walletLockToken = null;
+if (!RedisHelper::lock($walletLockKey, 4, $walletLockToken)) {
+    sendError('A wallet transaction is already in progress. Please wait a moment.', 429);
+}
 
 try {
     $pdo = getDBConnection();
@@ -65,4 +73,8 @@ try {
 } catch (PDOException $e) {
     if (isset($pdo) && $pdo->inTransaction()) { $pdo->rollBack(); }
     sendError('Database error: ' . $e->getMessage(), 500);
+} finally {
+    if (!empty($walletLockKey) && !empty($walletLockToken)) {
+        RedisHelper::unlock($walletLockKey, $walletLockToken);
+    }
 }

@@ -49,7 +49,7 @@ try {
     $hotel = $stmt->fetch(PDO::FETCH_ASSOC);
 
     // Fetch customer address coordinates
-    $stmt = $pdo->prepare("SELECT latitude, longitude FROM customer_addresses WHERE customer_id = :customer_id LIMIT 1");
+    $stmt = $pdo->prepare("SELECT latitude, longitude FROM customer_addresses WHERE customer_id = :customer_id ORDER BY is_default DESC, id DESC LIMIT 1");
     $stmt->execute([':customer_id' => $customerId]);
     $custAddr = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -61,11 +61,13 @@ try {
         $driver = $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    // Fetch order items with food names
+    // Fetch order items with food names and mandatory/optional customizations
     $stmt = $pdo->prepare("
-        SELECT oi.price, oi.quantity, m.food_name 
+        SELECT oi.price, oi.quantity, oi.customizations,
+               COALESCE(oi.mandatory_items, m.mandatory_items) AS mandatory_items,
+               COALESCE(m.food_name, 'Food Item') AS food_name
         FROM order_items oi
-        JOIN menus m ON m.id = oi.menu_item_id
+        LEFT JOIN menus m ON m.id = oi.menu_item_id
         WHERE oi.order_id = :order_id
     ");
     $stmt->execute([':order_id' => $orderId]);
@@ -81,18 +83,23 @@ try {
     $data = [
         'order_id' => (int)$order['order_id'],
         'status' => $order['status'],
+        'meal_type' => $order['meal_type'] ?? 'Lunch',
         'subtotal' => (float)$subtotal,
         'delivery_fee' => (float)$order['delivery_fee'],
         'tax_amount' => (float)$order['tax_amount'],
         'grand_total' => (float)$order['grand_total'],
         'wallet_deducted' => (float)$order['wallet_deducted'],
+        'tiffin_charge' => (float)($order['tiffin_charge'] ?? 50.00),
         'payment_method' => $order['payment_method'],
         'delivery_address' => $order['delivery_address'],
         'created_at' => $order['created_at'],
+        'delivery_otp' => $order['delivery_otp'],
+        'delivered_at' => $order['delivered_at'],
         'hotel' => [
             'id' => (int)$hotel['id'],
             'hotel_name' => $hotel['hotel_name'],
             'hotel_address' => $hotel['hotel_address'],
+            'phone_number' => $hotel['mobile_number'] ?? '',
             'rating' => '4.0', // Default rating representation
             'photo_url' => $hotel['photo_url'] ? $hotel['photo_url'] : '',
             'latitude' => (float)$hotel['latitude'],
@@ -103,10 +110,43 @@ try {
             'longitude' => $custAddr ? (float)$custAddr['longitude'] : 73.8567
         ],
         'items' => array_map(function($i) {
+            $mList = [];
+            if (!empty($i['mandatory_items'])) {
+                $mDec = json_decode($i['mandatory_items'], true);
+                if (is_array($mDec)) $mList = $mDec;
+            }
+            $optList = [];
+            if (!empty($i['customizations'])) {
+                $optDec = json_decode($i['customizations'], true);
+                if (is_array($optDec)) {
+                    $isAssoc = (array_keys($optDec) !== range(0, count($optDec) - 1));
+                    if ($isAssoc) {
+                        foreach ($optDec as $k => $v) {
+                            if (is_array($v)) $v = implode(', ', $v);
+                            $optList[] = is_numeric($k) ? (string)$v : "$k: $v";
+                        }
+                    } else {
+                        foreach ($optDec as $val) {
+                            if (is_array($val)) {
+                                foreach ($val as $k => $v) {
+                                    $optList[] = is_numeric($k) ? (string)$v : "$k: $v";
+                                }
+                            } else {
+                                $optList[] = (string)$val;
+                            }
+                        }
+                    }
+                } else if (is_string($i['customizations'])) {
+                    $optList = [$i['customizations']];
+                }
+            }
+
             return [
                 'food_name' => $i['food_name'],
-                'quantity' => (int)$i['quantity'],
-                'price' => (float)$i['price']
+                'quantity'  => (int)$i['quantity'],
+                'price'     => (float)$i['price'],
+                'mandatory_items' => $mList,
+                'selected_optional_items' => $optList,
             ];
         }, $items),
         'delivery_partner' => $driver ? [

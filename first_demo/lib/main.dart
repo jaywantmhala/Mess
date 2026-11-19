@@ -1,15 +1,55 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
+import 'services/auth_service.dart';
 import 'services/fcm_service.dart';
+import 'services/meal_reminder_service.dart';
+import 'services/app_update_service.dart';
 import 'screens/welcome_screen.dart';
+import 'screens/home_shell.dart';
+import 'utils/api_client.dart';
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  AppUpdateService.instance.initialize(navigatorKey: navigatorKey);
   await FcmService.instance.initialize();
-  runApp(const MyApp());
+  await MealReminderService.instance.initialize();
+  final loggedIn = await AuthService.instance.isLoggedIn();
+
+  // Handle global unauthenticated / session expired event
+  ApiClient.instance.onUnauthenticated.listen((_) async {
+    final navState = navigatorKey.currentState;
+    final ctx = navigatorKey.currentContext;
+    await AuthService.instance.logout();
+    if (ctx != null) {
+      ScaffoldMessenger.of(ctx).showSnackBar(
+        SnackBar(
+          content: const Text('Your session has expired. Please sign in again.'),
+          backgroundColor: Colors.red.shade600,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+    navState?.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+      (route) => false,
+    );
+  });
+
+  runApp(MyApp(loggedIn: loggedIn));
+
+  // Check for Google Play in-app updates after UI finishes mounting
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    AppUpdateService.instance.checkForUpdate();
+  });
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool loggedIn;
+
+  const MyApp({super.key, required this.loggedIn});
 
   @override
   Widget build(BuildContext context) {
@@ -17,12 +57,19 @@ class MyApp extends StatelessWidget {
     const coralDark = Color(0xFFE05555);
 
     return MaterialApp(
-      title: 'ZenQube Dining',
+      navigatorKey: navigatorKey,
+      title: "Hungrily Foods",
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.light,
         useMaterial3: true,
         scaffoldBackgroundColor: const Color(0xFFF9FAFB),
+        pageTransitionsTheme: PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: const CupertinoPageTransitionsBuilder(),
+            TargetPlatform.iOS: const CupertinoPageTransitionsBuilder(),
+          },
+        ),
         colorScheme: ColorScheme.fromSeed(
           brightness: Brightness.light,
           seedColor: coral,
@@ -36,7 +83,6 @@ class MyApp extends StatelessWidget {
           onBackground: const Color(0xFF1A1A2E),
           error: const Color(0xFFEF4444),
         ),
-        // Input fields default to outlined style
         inputDecorationTheme: InputDecorationTheme(
           filled: true,
           fillColor: Colors.white,
@@ -58,7 +104,6 @@ class MyApp extends StatelessWidget {
             borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.8),
           ),
         ),
-        // ElevatedButton defaults
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             backgroundColor: coral,
@@ -70,17 +115,15 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ),
-        // AppBar defaults (light, minimal)
         appBarTheme: const AppBarTheme(
           backgroundColor: Colors.white,
           foregroundColor: Color(0xFF1A1A2E),
           elevation: 0,
           centerTitle: false,
         ),
-        // Divider
         dividerColor: const Color(0xFFE5E7EB),
       ),
-      home: const WelcomeScreen(),
+      home: loggedIn ? const HomeShell() : const WelcomeScreen(),
     );
   }
 }

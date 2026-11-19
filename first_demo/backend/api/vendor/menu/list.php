@@ -62,8 +62,15 @@ $stmt->execute([
     ':hotel_id'  => $hotelId,
     ':menu_date' => $menuDate,
 ]);
-$menuItems = $stmt->fetchAll();
+$menuItems = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+$formattedItems = array_map(function($item) {
+    $item['meal_type']       = !empty($item['meal_type']) ? $item['meal_type'] : 'Lunch';
+    $item['mandatory_items'] = !empty($item['mandatory_items']) ? (json_decode($item['mandatory_items'], true) ?: []) : [];
+    $item['optional_items']  = !empty($item['optional_items']) ? (json_decode($item['optional_items'], true) ?: []) : [];
+    return $item;
+}, $menuItems);
 
 sendSuccess('Daily menu items retrieved successfully.', [
-    'menu_items' => $menuItems,
+    'menu_items' => $formattedItems,
 ]);

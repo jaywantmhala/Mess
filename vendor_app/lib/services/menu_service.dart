@@ -3,10 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../models/menu_item.dart';
+import '../utils/app_config.dart';
 import 'auth_service.dart';
 
-const String _baseIp = '127.0.0.1';
-const String _baseUrl = 'http://$_baseIp:8000/api/vendor/menu';
+String get _baseUrl => '$kBaseUrl/menu';
 const Duration _timeout = Duration(seconds: 15);
 
 class MenuResult {
@@ -71,6 +71,9 @@ class MenuService {
     required bool isPopular,
     required bool isAvailable,
     required String menuDate,
+    String mealType = 'Lunch',
+    List<String> mandatoryItems = const [],
+    List<String> optionalItems = const [],
     String? imageUrl,
   }) async {
     try {
@@ -96,6 +99,9 @@ class MenuService {
               'is_popular': isPopular ? 1 : 0,
               'is_available': isAvailable ? 1 : 0,
               'menu_date': menuDate,
+              'meal_type': mealType,
+              'mandatory_items': mandatoryItems,
+              'optional_items': optionalItems,
               if (imageUrl != null) 'image_url': imageUrl,
             }),
           )
@@ -138,6 +144,9 @@ class MenuService {
     required bool isPopular,
     required bool isAvailable,
     required String menuDate,
+    String? mealType,
+    List<String>? mandatoryItems,
+    List<String>? optionalItems,
     String? imageUrl,
   }) async {
     try {
@@ -163,6 +172,8 @@ class MenuService {
               'is_popular': isPopular ? 1 : 0,
               'is_available': isAvailable ? 1 : 0,
               'menu_date': menuDate,
+              if (mandatoryItems != null) 'mandatory_items': mandatoryItems,
+              if (optionalItems != null) 'optional_items': optionalItems,
               if (imageUrl != null) 'image_url': imageUrl,
             }),
           )

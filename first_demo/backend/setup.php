@@ -13,12 +13,14 @@
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 
-// ── Configuration (must match config/database.php) ─────────────────────────
-$host    = 'localhost';
-$user    = 'root';
-$pass    = 'root';          // ← Change to your MySQL password (blank for XAMPP default)
-$dbName  = 'first_demo_db';
-$port    = 3306;        // ← Default MySQL port
+require_once __DIR__ . '/config/database.php';
+
+// ── Configuration (from config/database.php) ─────────────────────────
+$host    = DB_HOST;
+$user    = DB_USER;
+$pass    = DB_PASS;
+$dbName  = DB_NAME;
+$port    = DB_PORT;
 
 // ── Helper: print styled result ─────────────────────────────────────────────
 function result(string $label, bool $ok, string $detail = ''): void {
@@ -181,9 +183,11 @@ if (file_exists($configPath)) {
 
 // ── Step 8: Test API endpoints reachability ──────────────────────────────────
 echo "<h2>Step 5 — API Endpoints</h2>";
-$base = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? 'https' : 'http')
-        . '://' . $_SERVER['HTTP_HOST']
-        . rtrim(dirname($_SERVER['REQUEST_URI']), '/');
+$httpHost   = $_SERVER['HTTP_HOST'] ?? 'localhost:8000';
+$requestUri = $_SERVER['REQUEST_URI'] ?? '/setup.php';
+$scheme     = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+
+$base = $scheme . '://' . $httpHost . rtrim(dirname($requestUri), '/');
 
 $endpoints = [
     ['POST', "$base/api/auth/signup.php",  'Register a new customer'],
@@ -210,19 +214,18 @@ echo "<strong>Delete or disable setup.php</strong> before deploying to productio
 echo "It exposes your database credentials and server configuration.";
 echo "</div>";
 
-// ── Handy cURL test commands ─────────────────────────────────────────────────
-echo "<h2>Quick Test with cURL</h2>";
-echo "<pre>";
-echo "# Sign Up\n";
-echo 'curl -X POST ' . $base . '/api/auth/signup.php \' . "\n";
-echo '     -H "Content-Type: application/json" \' . "\n";
-echo '     -d \'{"full_name":"Test User","email":"test@example.com","password":"Test1234","confirm_password":"Test1234"}\'';
-echo "\n\n# Login\n";
-echo 'curl -X POST ' . $base . '/api/auth/login.php \' . "\n";
-echo '     -H "Content-Type: application/json" \' . "\n";
-echo '     -d \'{"email":"test@example.com","password":"Test1234"}\'';
-echo "</pre>";
 ?>
+<h2>Quick Test with cURL</h2>
+<pre>
+# Sign Up
+curl -X POST <?= $base ?>/api/auth/signup.php \
+     -H "Content-Type: application/json" \
+     -d '{"full_name":"Test User","email":"test@example.com","password":"Test1234","confirm_password":"Test1234"}'
 
+# Login
+curl -X POST <?= $base ?>/api/auth/login.php \
+     -H "Content-Type: application/json" \
+     -d '{"email":"test@example.com","password":"Test1234"}'
+</pre>
 </body>
 </html>

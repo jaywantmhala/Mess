@@ -5,9 +5,9 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/driver.dart';
 import 'fcm_service.dart';
+import '../utils/app_config.dart';
 
-const String _baseIp = '127.0.0.1';
-const String _baseUrl = 'http://$_baseIp:8000/api/driver';
+final String _baseUrl = '$kApiHost/driver';
 const Duration _timeout = Duration(seconds: 15);
 
 // SharedPreferences keys
@@ -41,18 +41,24 @@ class DriverAuthService {
     required String phoneNumber,
   }) async {
     try {
+      final fcmToken = await FcmService.instance.getToken();
+      final Map<String, dynamic> reqBody = {
+        'full_name': fullName.trim(),
+        'email': email.trim().toLowerCase(),
+        'password': password,
+        'confirm_password': confirmPassword,
+        'vehicle_number': vehicleNumber.trim(),
+        'phone_number': phoneNumber.trim(),
+      };
+      if (fcmToken != null && fcmToken.isNotEmpty) {
+        reqBody['fcm_token'] = fcmToken;
+      }
+
       final response = await http
           .post(
             Uri.parse('$_baseUrl/signup'),
             headers: {'Content-Type': 'application/json; charset=utf-8'},
-            body: jsonEncode({
-              'full_name': fullName.trim(),
-              'email': email.trim().toLowerCase(),
-              'password': password,
-              'confirm_password': confirmPassword,
-              'vehicle_number': vehicleNumber.trim(),
-              'phone_number': phoneNumber.trim(),
-            }),
+            body: jsonEncode(reqBody),
           )
           .timeout(_timeout);
 
@@ -91,14 +97,20 @@ class DriverAuthService {
     required String password,
   }) async {
     try {
+      final fcmToken = await FcmService.instance.getToken();
+      final Map<String, dynamic> reqBody = {
+        'email': email.trim().toLowerCase(),
+        'password': password,
+      };
+      if (fcmToken != null && fcmToken.isNotEmpty) {
+        reqBody['fcm_token'] = fcmToken;
+      }
+
       final response = await http
           .post(
             Uri.parse('$_baseUrl/login'),
             headers: {'Content-Type': 'application/json; charset=utf-8'},
-            body: jsonEncode({
-              'email': email.trim().toLowerCase(),
-              'password': password,
-            }),
+            body: jsonEncode(reqBody),
           )
           .timeout(_timeout);
 
@@ -145,8 +157,8 @@ class DriverAuthService {
         },
         body: jsonEncode({
           'is_online': isOnline ? 1 : 0,
-          if (latitude != null) 'latitude': latitude,
-          if (longitude != null) 'longitude': longitude,
+          ...?latitude != null ? {'latitude': latitude} : null,
+          ...?longitude != null ? {'longitude': longitude} : null,
         }),
       ).timeout(_timeout);
 
@@ -178,12 +190,14 @@ class DriverAuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kToken);
     await prefs.remove(_kDriver);
+    await prefs.remove('active_role');
   }
 
   Future<void> _persist(String token, Driver driver) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kToken, token);
     await prefs.setString(_kDriver, jsonEncode(driver.toJson()));
+    await prefs.setString('active_role', 'driver');
     // Register FCM token for Driver
     FcmService.instance.registerToken('driver');
   }

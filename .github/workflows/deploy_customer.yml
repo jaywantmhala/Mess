@@ -66,9 +66,9 @@ jobs:
         working-directory: first_demo
         run: |
           if [ -n "$BUILD_NAME" ] && [ -n "$BUILD_NUMBER" ]; then
-            flutter build appbundle --release --build-name="$BUILD_NAME" --build-number="$BUILD_NUMBER"
+            flutter build appbundle --release --android-skip-build-dependency-validation --build-name="$BUILD_NAME" --build-number="$BUILD_NUMBER"
           else
-            flutter build appbundle --release
+            flutter build appbundle --release --android-skip-build-dependency-validation
           fi
 
       - name: Deploy to Google Play Store

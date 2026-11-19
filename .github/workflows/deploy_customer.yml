@@ -2,8 +2,11 @@ name: Deploy Customer App to Google Play Store
 
 on:
   push:
-    tags:
-      - 'customer-v*'
+    branches:
+      - main
+    paths:
+      - 'first_demo/**'
+      - '.github/workflows/deploy_customer.yml'
   workflow_dispatch:
     inputs:
       track:
@@ -51,25 +54,18 @@ jobs:
         working-directory: first_demo
         run: flutter pub get
 
-      - name: Determine Version & Build Number from Git Tag
+      - name: Auto-Determine Version & Auto-Increment Build Number
+        working-directory: first_demo
         run: |
-          if [[ "${{ github.ref_type }}" == "tag" ]]; then
-            # Extract tag version (e.g., customer-v1.0.12 -> 1.0.12)
-            TAG_VER="${GITHUB_REF_NAME#customer-v}"
-            BUILD_NUM=$(( ${{ github.run_number }} + 100 ))
-            echo "BUILD_NAME=$TAG_VER" >> $GITHUB_ENV
-            echo "BUILD_NUMBER=$BUILD_NUM" >> $GITHUB_ENV
-            echo "Building tagged Customer release: $TAG_VER+$BUILD_NUM"
-          fi
+          PUBSPEC_VER=$(grep '^version:' pubspec.yaml | sed 's/version: //' | cut -d'+' -f1 | tr -d '[:space:]')
+          BUILD_NUM=$(( ${{ github.run_number }} + 100 ))
+          echo "BUILD_NAME=$PUBSPEC_VER" >> $GITHUB_ENV
+          echo "BUILD_NUMBER=$BUILD_NUM" >> $GITHUB_ENV
+          echo "Auto-Release Customer App: $PUBSPEC_VER (Build $BUILD_NUM)"
 
       - name: Build Release App Bundle (AAB)
         working-directory: first_demo
-        run: |
-          if [ -n "$BUILD_NAME" ] && [ -n "$BUILD_NUMBER" ]; then
-            flutter build appbundle --release --android-skip-build-dependency-validation --build-name="$BUILD_NAME" --build-number="$BUILD_NUMBER"
-          else
-            flutter build appbundle --release --android-skip-build-dependency-validation
-          fi
+        run: flutter build appbundle --release --android-skip-build-dependency-validation --build-name="$BUILD_NAME" --build-number="$BUILD_NUMBER"
 
       - name: Deploy to Google Play Store
         uses: r0adkll/upload-google-play@v1

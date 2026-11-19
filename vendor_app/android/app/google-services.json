@@ -9,7 +9,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:232992360917:android:3f52a78ac5f26952e0155c",
         "android_client_info": {
-          "package_name": "com.example.first_demo"
+          "package_name": "com.zenqube.hungrilyfoods"
         }
       },
       "oauth_client": [],
@@ -28,7 +28,7 @@
       "client_info": {
         "mobilesdk_app_id": "1:232992360917:android:8d82592e63c00f3ae0155c",
         "android_client_info": {
-          "package_name": "com.example.vendor_app"
+          "package_name": "com.zenqube.hungrilyfoodsvendor"
         }
       },
       "oauth_client": [],

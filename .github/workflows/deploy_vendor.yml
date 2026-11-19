@@ -48,14 +48,9 @@ jobs:
         run: |
           echo "$KEYSTORE_BASE64" | tr -d '\r\n ' | base64 -d > vendor_app/android/upload-keystore.jks
           cp vendor_app/android/upload-keystore.jks vendor_app/android/app/upload-keystore.jks
-          cat << 'EOF' > vendor_app/android/key.properties
-          storePassword=HungrilyFoods@2026Key
-          keyPassword=HungrilyFoods@2026Key
-          keyAlias=upload
-          storeFile=upload-keystore.jks
-          EOF
+          printf "storePassword=HungrilyFoods@2026Key\nkeyPassword=HungrilyFoods@2026Key\nkeyAlias=upload\nstoreFile=upload-keystore.jks\n" > vendor_app/android/key.properties
           cp vendor_app/android/key.properties vendor_app/android/app/key.properties
-          echo "Verifying restored keystore:"
+          echo "Verifying Vendor Keystore:"
           keytool -list -v -keystore vendor_app/android/upload-keystore.jks -storepass HungrilyFoods@2026Key | grep -i "SHA1:"
 
       - name: Install Dependencies
@@ -74,6 +69,11 @@ jobs:
       - name: Build Release App Bundle (AAB)
         working-directory: vendor_app
         run: flutter build appbundle --release --android-skip-build-dependency-validation --build-name="$BUILD_NAME" --build-number="$BUILD_NUMBER"
+
+      - name: Verify Signed AAB Certificate
+        run: |
+          echo "Verifying signature certificate in generated AAB:"
+          keytool -printcert -jarfile vendor_app/build/app/outputs/bundle/release/*.aab | grep -i "SHA1:"
 
       - name: Deploy to Google Play Store
         uses: r0adkll/upload-google-play@v1

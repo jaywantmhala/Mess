@@ -1,0 +1,81 @@
+name: Deploy Customer App to Google Play Store
+
+on:
+  push:
+    tags:
+      - 'customer-v*'
+  workflow_dispatch:
+    inputs:
+      track:
+        description: 'Google Play Release Track'
+        required: true
+        default: 'internal'
+        type: choice
+        options:
+          - internal
+          - alpha
+          - beta
+          - production
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy Customer App AAB
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Restore Keystore & Signing Configuration
+        env:
+          KEYSTORE_BASE64: ${{ secrets.CUSTOMER_KEYSTORE_BASE64 }}
+          KEY_PROPERTIES: ${{ secrets.CUSTOMER_KEY_PROPERTIES }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 --decode > first_demo/android/upload-keystore.jks
+          echo "$KEY_PROPERTIES" > first_demo/android/key.properties
+
+      - name: Install Dependencies
+        working-directory: first_demo
+        run: flutter pub get
+
+      - name: Determine Version & Build Number from Git Tag
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            # Extract tag version (e.g., customer-v1.0.12 -> 1.0.12)
+            TAG_VER="${GITHUB_REF_NAME#customer-v}"
+            BUILD_NUM=$(( ${{ github.run_number }} + 100 ))
+            echo "BUILD_NAME=$TAG_VER" >> $GITHUB_ENV
+            echo "BUILD_NUMBER=$BUILD_NUM" >> $GITHUB_ENV
+            echo "Building tagged Customer release: $TAG_VER+$BUILD_NUM"
+          fi
+
+      - name: Build Release App Bundle (AAB)
+        working-directory: first_demo
+        run: |
+          if [ -n "$BUILD_NAME" ] && [ -n "$BUILD_NUMBER" ]; then
+            flutter build appbundle --release --build-name="$BUILD_NAME" --build-number="$BUILD_NUMBER"
+          else
+            flutter build appbundle --release
+          fi
+
+      - name: Deploy to Google Play Store
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_JSON_KEY }}
+          packageName: com.zenqube.hungrilyfoods
+          releaseFiles: first_demo/build/app/outputs/bundle/release/*.aab
+          track: ${{ github.event.inputs.track || 'internal' }}
+          status: completed

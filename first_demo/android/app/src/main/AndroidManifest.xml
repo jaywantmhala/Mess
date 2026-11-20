@@ -108,10 +108,18 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="gpay" />
         </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="tez" />
+        </intent>
+        <!-- Popular UPI App Packages for Android 11+ Package Visibility -->
+        <package android:name="com.google.android.apps.nbu.paisa.user" />
         <package android:name="com.phonepe.app" />
         <package android:name="net.one97.paytm" />
-        <package android:name="com.google.android.apps.nfc.plugin" />
         <package android:name="in.org.npci.upiapp" />
         <package android:name="com.cred.pay" />
+        <package android:name="in.amazon.mShop.android.shopping" />
+        <package android:name="com.whatsapp" />
+        <package android:name="com.google.android.apps.nfc.plugin" />
     </queries>
 </manifest>

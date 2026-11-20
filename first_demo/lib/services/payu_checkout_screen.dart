@@ -44,11 +44,18 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
 
       // Convert intent:// scheme to standard upi:// scheme if needed
       if (rawUrl.startsWith('intent://')) {
-        final intentMatch = RegExp(r'intent://(.*?)#Intent;').firstMatch(rawUrl);
-        if (intentMatch != null && intentMatch.group(1) != null) {
-          launchableUrl = 'upi://${intentMatch.group(1)}';
+        if (rawUrl.contains('data=upi')) {
+          final dataMatch = RegExp(r'data=(upi[^;&]+)').firstMatch(rawUrl);
+          if (dataMatch != null && dataMatch.group(1) != null) {
+            launchableUrl = Uri.decodeComponent(dataMatch.group(1)!);
+          }
         } else {
-          launchableUrl = rawUrl.replaceFirst('intent://', 'upi://').split('#Intent;')[0];
+          final intentMatch = RegExp(r'intent://(.*?)#Intent;').firstMatch(rawUrl);
+          if (intentMatch != null && intentMatch.group(1) != null) {
+            launchableUrl = 'upi://${intentMatch.group(1)}';
+          } else {
+            launchableUrl = rawUrl.replaceFirst('intent://', 'upi://').split('#Intent;')[0];
+          }
         }
       }
 
@@ -56,14 +63,22 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
       debugPrint('🚀 [PayU Checkout] Launching URI: $uri');
 
       bool launched = false;
-      if (await canLaunchUrl(uri)) {
-        launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      try {
+        if (await canLaunchUrl(uri)) {
+          launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+        }
+      } catch (e) {
+        debugPrint('⚠️ canLaunchUrl failed: $e');
       }
 
       if (!launched) {
         // Fallback launch attempt with force external app mode
-        final rawUri = Uri.parse(rawUrl);
-        await launchUrl(rawUri, mode: LaunchMode.externalApplication);
+        try {
+          final rawUri = Uri.parse(rawUrl);
+          await launchUrl(rawUri, mode: LaunchMode.externalApplication);
+        } catch (e2) {
+          debugPrint('❌ Fallback launch failed: $e2');
+        }
       }
     } catch (e) {
       debugPrint('❌ [PayU Checkout] Error launching UPI app: $e');
@@ -105,6 +120,30 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
             "name": "Hungrily Foods",
             "description": "$description",
             "order_id": "$orderId",
+            "method": {
+              "netbanking": true,
+              "card": true,
+              "wallet": true,
+              "upi": true
+            },
+            "config": {
+              "display": {
+                "blocks": {
+                  "upi": {
+                    "name": "Pay via UPI (GPay, PhonePe, Paytm)",
+                    "instruments": [
+                      {
+                        "method": "upi"
+                      }
+                    ]
+                  }
+                },
+                "sequence": ["block.upi", "block.other"],
+                "preferences": {
+                  "show_default_blocks": true
+                }
+              }
+            },
             "handler": function (response) {
               var pid = response.razorpay_payment_id || '';
               var oid = response.razorpay_order_id || '$orderId';
@@ -145,6 +184,7 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
     ''';
 
     _controller = WebViewController()
+      ..setUserAgent("Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36")
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0x00000000))
       ..setNavigationDelegate(
@@ -191,6 +231,8 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
                 lowerUrl.startsWith('tez://') ||
                 lowerUrl.startsWith('bhim://') ||
                 lowerUrl.startsWith('cred://') ||
+                lowerUrl.startsWith('amazonpay://') ||
+                lowerUrl.startsWith('whatsapp://') ||
                 (!lowerUrl.startsWith('http://') && !lowerUrl.startsWith('https://') && !lowerUrl.startsWith('about:'))) {
               _launchUpiApp(url);
               return NavigationDecision.prevent;
@@ -200,7 +242,7 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
           },
         ),
       )
-      ..loadHtmlString(htmlContent);
+      ..loadHtmlString(htmlContent, baseUrl: 'https://hungrilyfoods.com');
   }
 
   bool _checkUrl(String url) {

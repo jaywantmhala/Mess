@@ -17,4 +17,6 @@ key.properties
 *.mp4
 **/*.mp4
 *.hprof
+omni/
 **/*.hprof
+omni/

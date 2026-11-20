@@ -67,11 +67,12 @@ class PayUService {
   PayUService._();
   static final PayUService instance = PayUService._();
 
-  static const String payuMerchantKey = 'ddhaRc';
+  static const String razorpayMerchantKey = 'rzp_live_TM0oXWEH4xu1NQ';
+  static const String payuMerchantKey = razorpayMerchantKey;
 
-  /// Step 1: Create PayU Order on Backend API (/api/customer/payu/create_order)
-  Future<PayUOrderResult> createOrder(int planId) async {
-    debugPrint('➡️ [PayUService] Initiating createOrder() for Plan ID: $planId');
+  /// Step 1: Create Razorpay Order on Backend API (/api/customer/razorpay/create_order)
+  Future<PayUOrderResult> createOrder(int planId, {double? amount}) async {
+    debugPrint('➡️ [PayUService] Initiating createOrder() for Plan ID: $planId, amount: $amount');
     try {
       final token = await AuthService.instance.getSavedToken();
       if (token == null) {
@@ -79,8 +80,12 @@ class PayUService {
         return PayUOrderResult(success: false, message: 'Session expired. Please log in.');
       }
 
-      final uri = Uri.parse('$kBaseUrl/api/customer/payu/create_order');
-      final payload = jsonEncode({'plan_id': planId});
+      final uri = Uri.parse('$kBaseUrl/api/customer/razorpay/create_order');
+      final payloadMap = <String, dynamic>{'plan_id': planId};
+      if (amount != null && amount > 0) {
+        payloadMap['amount'] = amount;
+      }
+      final payload = jsonEncode(payloadMap);
 
       debugPrint('🌐 [PayUService] Sending POST request to: $uri');
       debugPrint('📤 [PayUService] Request Payload: $payload');
@@ -109,24 +114,23 @@ class PayUService {
 
       if (body['success'] == true && body['data'] != null) {
         final data = body['data'] as Map<String, dynamic>;
-        final orderId = data['order_id']?.toString() ?? data['txnid']?.toString();
-        final keyId = data['key_id']?.toString() ?? data['key']?.toString() ?? payuMerchantKey;
+        final orderId = data['order_id']?.toString() ?? data['razorpay_order_id']?.toString() ?? data['txnid']?.toString();
+        final keyId = data['key_id']?.toString() ?? data['key']?.toString() ?? razorpayMerchantKey;
         final amountPaise = data['amount_paise'] as int?;
-        final amount = (data['amount'] as num?)?.toDouble();
+        final amountVal = (data['amount'] as num?)?.toDouble();
 
-        debugPrint('✅ [PayUService] Order Created Successfully!');
-        debugPrint('   - PayU Txn ID: $orderId');
+        debugPrint('✅ [PayUService] Razorpay Order Created Successfully!');
+        debugPrint('   - Razorpay Order ID: $orderId');
         debugPrint('   - Key: $keyId');
-        debugPrint('   - Hash: ${data['hash']}');
 
         return PayUOrderResult(
           success: true,
           orderId: orderId,
           keyId: keyId,
-          txnid: data['txnid']?.toString() ?? orderId,
-          internalTransactionId: data['internal_transaction_id']?.toString(),
+          txnid: orderId,
+          internalTransactionId: data['internal_transaction_id']?.toString() ?? orderId,
           amountPaise: amountPaise,
-          amount: amount,
+          amount: amountVal,
           planName: data['plan_name']?.toString() ?? data['productinfo']?.toString(),
           customerName: data['customer_name']?.toString() ?? data['firstname']?.toString(),
           customerEmail: data['customer_email']?.toString(),
@@ -141,7 +145,7 @@ class PayUService {
         );
       }
 
-      final errMsg = body['message']?.toString() ?? 'Failed to create PayU payment order.';
+      final errMsg = body['message']?.toString() ?? 'Failed to create Razorpay payment order.';
       debugPrint('❌ [PayUService] PHP API Error: $errMsg');
       return PayUOrderResult(success: false, message: errMsg);
 
@@ -152,7 +156,7 @@ class PayUService {
     }
   }
 
-  /// Step 2: Verify PayU Payment Signature & Server Status (/api/customer/payu/verify_payment)
+  /// Step 2: Verify Razorpay Payment Signature & Server Status (/api/customer/razorpay/verify_payment)
   Future<PayUVerifyResult> verifyPayment({
     required String orderId,
     required String razorpayPaymentId,
@@ -161,8 +165,8 @@ class PayUService {
     String? internalTransactionId,
   }) async {
     debugPrint('➡️ [PayUService] Initiating verifyPayment()');
-    debugPrint('   - Txn/Order ID: $orderId');
-    debugPrint('   - PayU ID: $razorpayPaymentId');
+    debugPrint('   - Razorpay Order ID: $orderId');
+    debugPrint('   - Razorpay Payment ID: $razorpayPaymentId');
     debugPrint('   - Plan ID: $planId');
 
     try {
@@ -172,14 +176,16 @@ class PayUService {
         return PayUVerifyResult(success: false, message: 'Session expired. Please log in.');
       }
 
-      final uri = Uri.parse('$kBaseUrl/api/customer/payu/verify_payment');
+      final uri = Uri.parse('$kBaseUrl/api/customer/razorpay/verify_payment');
       final payload = jsonEncode({
-        'txnid': orderId,
         'order_id': orderId,
+        'razorpay_order_id': orderId,
+        'txnid': orderId,
+        'razorpay_payment_id': razorpayPaymentId,
         'mihpayid': razorpayPaymentId,
         'payu_payment_id': razorpayPaymentId,
-        'hash': razorpaySignature,
         'razorpay_signature': razorpaySignature,
+        'hash': razorpaySignature,
         'status': 'success',
         'plan_id': planId,
         'internal_transaction_id': internalTransactionId,
@@ -230,7 +236,7 @@ class PayUService {
     }
   }
 
-  /// Helper to build PayU Checkout options map
+  /// Helper to build Razorpay Checkout options map
   Map<String, dynamic> buildCheckoutOptions({
     required String orderId,
     required String keyId,
@@ -246,29 +252,33 @@ class PayUService {
     String? udf1,
     String? udf2,
   }) {
-    final key = keyId.isNotEmpty ? keyId : payuMerchantKey;
+    final key = keyId.isNotEmpty ? keyId : razorpayMerchantKey;
     final amountDouble = amountPaise / 100.0;
-    debugPrint('⚙️ [PayUService] Building PayU Checkout Options Map:');
+    debugPrint('⚙️ [PayUService] Building Razorpay Checkout Options Map:');
     debugPrint('   - key: $key');
     debugPrint('   - amount: $amountDouble');
-    debugPrint('   - txnid: $orderId');
+    debugPrint('   - order_id: $orderId');
 
     return {
       'key': key,
+      'key_id': key,
+      'order_id': orderId,
       'txnid': orderId,
       'amount': amountDouble.toStringAsFixed(2),
       'amount_paise': amountPaise,
+      'name': 'Hungrily Foods',
       'productinfo': planName,
+      'description': planName,
       'firstname': (customerName != null && customerName.isNotEmpty) ? customerName.split(' ')[0] : 'Customer',
+      'customer_name': customerName ?? 'Customer',
       'email': (customerEmail != null && customerEmail.isNotEmpty) ? customerEmail : 'customer@hungrilyfoods.com',
       'phone': (customerPhone != null && customerPhone.isNotEmpty) ? customerPhone : '9876543210',
       'hash': hash ?? '',
-      'action': action ?? (kUseLocalUrl ? 'https://test.payu.in/_payment' : 'https://secure.payu.in/_payment'),
+      'action': action ?? '',
       'surl': surl ?? '$kBaseUrl/api/customer/payu/success',
       'furl': furl ?? '$kBaseUrl/api/customer/payu/failure',
       'udf1': udf1 ?? '',
       'udf2': udf2 ?? '',
-      'order_id': orderId,
     };
   }
 }

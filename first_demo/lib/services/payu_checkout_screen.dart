@@ -5,8 +5,6 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'payu_service.dart';
 
-import '../utils/app_config.dart';
-
 class PayUCheckoutScreen extends StatefulWidget {
   final Map<String, dynamic> options;
   final Function(PayUVerifyResult result) onSuccess;
@@ -73,50 +71,75 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
   }
 
   void _initWebView() {
-    final action = widget.options['action']?.toString() ??
-        (kUseLocalUrl ? 'https://test.payu.in/_payment' : 'https://secure.payu.in/_payment');
-    final key = widget.options['key']?.toString() ?? PayUService.payuMerchantKey;
-    final txnid = widget.options['txnid']?.toString() ?? widget.options['order_id']?.toString() ?? '';
-    final amount = widget.options['amount']?.toString() ?? '199.00';
-    final productinfo = widget.options['productinfo']?.toString() ?? 'Subscription Plan';
-    final firstname = widget.options['firstname']?.toString() ?? 'Customer';
-    final email = widget.options['email']?.toString() ?? 'customer@hungrilyfoods.com';
-    final phone = widget.options['phone']?.toString() ?? '9876543210';
-    final hash = widget.options['hash']?.toString() ?? '';
-    final surl = widget.options['surl']?.toString() ?? '$kBaseUrl/api/customer/payu/success';
-    final furl = widget.options['furl']?.toString() ?? '$kBaseUrl/api/customer/payu/failure';
-    final udf1 = widget.options['udf1']?.toString() ?? '';
-    final udf2 = widget.options['udf2']?.toString() ?? '';
+    final key = widget.options['key_id']?.toString() ?? widget.options['key']?.toString() ?? PayUService.payuMerchantKey;
+    final orderId = widget.options['order_id']?.toString() ?? widget.options['txnid']?.toString() ?? '';
+    final amountPaise = widget.options['amount_paise']?.toString() ??
+        ((double.tryParse(widget.options['amount']?.toString() ?? '199.0') ?? 199.0) * 100).toInt().toString();
+    final description = widget.options['description']?.toString() ?? widget.options['productinfo']?.toString() ?? 'Hungrily Order';
+    final customerName = widget.options['customer_name']?.toString() ?? widget.options['firstname']?.toString() ?? 'Customer';
+    final customerEmail = widget.options['email']?.toString() ?? 'customer@hungrilyfoods.com';
+    final customerPhone = widget.options['phone']?.toString() ?? '9876543210';
 
     final htmlContent = '''
     <!DOCTYPE html>
     <html>
     <head>
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>PayU Payment</title>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+      <title>Razorpay Checkout</title>
       <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; text-align: center; padding-top: 50px; background: #fafafa; }
-        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #F58220; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #F58220; border-radius: 50%; width: 44px; height: 44px; animation: spin 1s linear infinite; margin: 20px auto; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
       </style>
+      <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     </head>
-    <body onload="document.forms['payuForm'].submit();">
-      <h2>Redirecting to PayU Gateway...</h2>
+    <body>
+      <h2>Opening Razorpay Gateway...</h2>
       <div class="spinner"></div>
-      <form name="payuForm" method="post" action="$action">
-        <input type="hidden" name="key" value="$key" />
-        <input type="hidden" name="txnid" value="$txnid" />
-        <input type="hidden" name="amount" value="$amount" />
-        <input type="hidden" name="productinfo" value="$productinfo" />
-        <input type="hidden" name="firstname" value="$firstname" />
-        <input type="hidden" name="email" value="$email" />
-        <input type="hidden" name="phone" value="$phone" />
-        <input type="hidden" name="surl" value="$surl" />
-        <input type="hidden" name="furl" value="$furl" />
-        <input type="hidden" name="udf1" value="$udf1" />
-        <input type="hidden" name="udf2" value="$udf2" />
-        <input type="hidden" name="hash" value="$hash" />
-      </form>
+      <script>
+        function openCheckout() {
+          var options = {
+            "key": "$key",
+            "amount": "$amountPaise",
+            "currency": "INR",
+            "name": "Hungrily Foods",
+            "description": "$description",
+            "order_id": "$orderId",
+            "handler": function (response) {
+              var pid = response.razorpay_payment_id || '';
+              var oid = response.razorpay_order_id || '$orderId';
+              var sig = response.razorpay_signature || '';
+              window.location.href = "hungrily://payment_success?razorpay_payment_id=" + encodeURIComponent(pid) + "&razorpay_order_id=" + encodeURIComponent(oid) + "&razorpay_signature=" + encodeURIComponent(sig);
+            },
+            "prefill": {
+              "name": "$customerName",
+              "email": "$customerEmail",
+              "contact": "$customerPhone"
+            },
+            "theme": {
+              "color": "#F58220"
+            },
+            "modal": {
+              "ondismiss": function() {
+                window.location.href = "hungrily://payment_cancelled";
+              }
+            }
+          };
+          try {
+            var rzp = new Razorpay(options);
+            rzp.on('payment.failed', function (resp) {
+              var errMsg = (resp && resp.error && resp.error.description) ? resp.error.description : 'Payment Failed';
+              window.location.href = "hungrily://payment_failure?error=" + encodeURIComponent(errMsg);
+            });
+            rzp.open();
+          } catch (e) {
+            window.location.href = "hungrily://payment_failure?error=" + encodeURIComponent(e.message || 'Razorpay checkout error');
+          }
+        }
+        window.onload = function() {
+          openCheckout();
+        };
+      </script>
     </body>
     </html>
     ''';
@@ -184,11 +207,7 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
     final lowerUrl = url.toLowerCase();
 
     if (lowerUrl.contains('hungrily://payment_success') ||
-        lowerUrl.contains('payu/success') ||
-        lowerUrl.contains('status=success') ||
-        lowerUrl.contains('txncdn.payubiz.in') ||
-        lowerUrl.contains('newresponse') ||
-        lowerUrl.contains('mihpayid=')) {
+        lowerUrl.contains('razorpay_payment_id=')) {
       if (!_handled) {
         _handled = true;
         if (mounted) {
@@ -197,11 +216,13 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
             _isLoading = false;
           });
         }
-        _handleSuccess();
+        _handleSuccess(url);
       }
       return true;
+    } else if (lowerUrl.contains('hungrily://payment_cancelled')) {
+      _handleCancel();
+      return true;
     } else if (lowerUrl.contains('hungrily://payment_failure') ||
-        lowerUrl.contains('payu/failure') ||
         lowerUrl.contains('status=failure')) {
       if (!_handled) {
         _handled = true;
@@ -211,21 +232,33 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
             _isLoading = false;
           });
         }
-        _handleFailure('Payment failed or cancelled on PayU gateway.');
+        final uri = Uri.tryParse(url);
+        final errMsg = uri?.queryParameters['error'] ?? 'Payment failed or cancelled.';
+        _handleFailure(errMsg);
       }
       return true;
     }
     return false;
   }
 
-  Future<void> _handleSuccess() async {
-    final txnid = widget.options['txnid']?.toString() ?? widget.options['order_id']?.toString() ?? '';
+  Future<void> _handleSuccess(String url) async {
+    final uri = Uri.tryParse(url);
+    final paymentId = uri?.queryParameters['razorpay_payment_id'] ??
+        widget.options['razorpay_payment_id']?.toString() ??
+        'pay_${DateTime.now().millisecondsSinceEpoch}';
+    final orderId = uri?.queryParameters['razorpay_order_id'] ??
+        widget.options['order_id']?.toString() ??
+        widget.options['txnid']?.toString() ??
+        '';
+    final signature = uri?.queryParameters['razorpay_signature'] ??
+        widget.options['razorpay_signature']?.toString() ??
+        '';
     final planId = widget.options['plan_id'] as int? ?? 1;
 
     final verifyRes = await PayUService.instance.verifyPayment(
-      orderId: txnid,
-      razorpayPaymentId: 'payu_$txnid',
-      razorpaySignature: widget.options['hash']?.toString() ?? '',
+      orderId: orderId,
+      razorpayPaymentId: paymentId,
+      razorpaySignature: signature,
       planId: planId,
     );
 
@@ -264,8 +297,8 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('PayU Checkout', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: const Color(0xFFF58220),
+        title: const Text('Razorpay Checkout', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF0C2340),
         iconTheme: const IconThemeData(color: Colors.white),
         leading: IconButton(
           icon: const Icon(Icons.close),
@@ -323,7 +356,7 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
             )
           else if (_isLoading)
             const Center(
-              child: CircularProgressIndicator(color: Color(0xFFF58220)),
+              child: CircularProgressIndicator(color: Color(0xFF0C2340)),
             ),
           // Fallback UI overlay for testing or Web mode
           if (kIsWeb)
@@ -337,10 +370,10 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      const Icon(Icons.payment, size: 64, color: Color(0xFFF58220)),
+                      const Icon(Icons.payment, size: 64, color: Color(0xFF0C2340)),
                       const SizedBox(height: 16),
                       Text(
-                        'PayU Payment Gateway',
+                        'Razorpay Payment Gateway',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
@@ -353,9 +386,9 @@ class _PayUCheckoutScreenState extends State<PayUCheckoutScreen> {
                           ElevatedButton.icon(
                             onPressed: _submitWebForm,
                             icon: const Icon(Icons.open_in_browser),
-                            label: const Text('Proceed to Official PayU Gateway Page'),
+                            label: const Text('Proceed to Official Razorpay Gateway'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFF58220),
+                              backgroundColor: const Color(0xFF0C2340),
                               foregroundColor: Colors.white,
                               minimumSize: const Size(double.infinity, 44),
                             ),

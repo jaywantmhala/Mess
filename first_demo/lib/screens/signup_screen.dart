@@ -261,7 +261,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                                         icon: Icons.location_on_rounded,
                                         iconColor: _brandOrange,
                                         title: 'Find Nearby',
-                                        subtitle: 'Restaurants',
+                                        subtitle: 'Mess',
                                       ),
                                     ),
 
@@ -285,7 +285,7 @@ class _SignUpScreenState extends State<SignUpScreen>
                                         icon: Icons.star_rounded,
                                         iconColor: const Color(0xFFF59E0B),
                                         title: 'Top Rated',
-                                        subtitle: 'Restaurants',
+                                        subtitle: 'Mess',
                                       ),
                                     ),
                                   ],

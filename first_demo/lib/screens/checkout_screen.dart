@@ -154,7 +154,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
   Future<void> _startPayUUpiPayment() async {
     setState(() => _isPlacingOrder = true);
     try {
-      final orderResult = await PayUService.instance.createOrder(1);
+      final orderResult = await PayUService.instance.createOrder(1, amount: _remainingPayable);
       final options = PayUService.instance.buildCheckoutOptions(
         orderId: orderResult.orderId ?? 'order_ord_${DateTime.now().millisecondsSinceEpoch}',
         keyId: orderResult.keyId ?? PayUService.payuMerchantKey,

@@ -10,7 +10,7 @@ class WebPayUService implements PaymentService {
   void dispose() {}
 
   @override
-  Future<PayUOrderResult> createOrder(int planId) async {
+  Future<PayUOrderResult> createOrder(int planId, {double? amount}) async {
     return PayUOrderResult(
       success: false,
       message: 'Web PayU is not supported on native mobile platform.',

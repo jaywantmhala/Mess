@@ -5,13 +5,14 @@ import 'package:flutter/foundation.dart';
 const bool kUseLocalUrl = false;
 
 const String _kLocalHostIp = '10.44.177.233:8000';
-const String _kLocalHostWeb = '10.44.177.233:8000';
-const String _kLocalHostAndroid = '10.44.177.233:8000';
-const String _kLocalHostIos = '10.44.177.233:8000';
+const String _kLocalHostWeb = 'localhost:8000';
 const String _kProdHost = 'hungrilyfoods.com';
 
 String get kHost {
   if (kUseLocalUrl) {
+    if (kIsWeb) {
+      return _kLocalHostWeb;
+    }
     return _kLocalHostIp;
   }
   return _kProdHost;

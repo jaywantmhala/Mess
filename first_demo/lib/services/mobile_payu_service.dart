@@ -17,8 +17,8 @@ class MobilePayUService implements PaymentService {
   }
 
   @override
-  Future<PayUOrderResult> createOrder(int planId) async {
-    return await PayUService.instance.createOrder(planId);
+  Future<PayUOrderResult> createOrder(int planId, {double? amount}) async {
+    return await PayUService.instance.createOrder(planId, amount: amount);
   }
 
   @override

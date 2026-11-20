@@ -6,14 +6,14 @@
 class ApiService {
     constructor() {
         // Set to true to connect all Admin operations directly to the live production server (https://hungrilyfoods.com/api)
-        // Set to false to run against local development server (http://10.44.177.233:8000/api)
-        this.useLiveProductionApi = false;
+        // Set to false to run against local development server (http://10.44.177.233:8000/api or localhost:8000/api)
+        this.useLiveProductionApi = true;
         this.liveProductionApiBase = 'https://hungrilyfoods.com/api';
         this.localIpApiBase = 'http://10.44.177.233:8000/api';
 
         if (this.useLiveProductionApi) {
             this.baseUrl = this.liveProductionApiBase;
-        } else if (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null' && window.location.protocol !== 'file:' && (window.location.hostname.startsWith('10.') || window.location.hostname.startsWith('192.168.'))) {
+        } else if (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin !== 'null' && window.location.protocol !== 'file:' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.hostname.startsWith('10.') || window.location.hostname.startsWith('192.168.'))) {
             this.baseUrl = `${window.location.origin}/api`;
         } else {
             this.baseUrl = this.localIpApiBase;

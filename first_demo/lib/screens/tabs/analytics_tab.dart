@@ -340,7 +340,7 @@ class _AnalyticsTabState extends State<AnalyticsTab> {
                                         ),
                                         SizedBox(height: 2),
                                         Text(
-                                          'Use your tokens to order delicious meals from your favorite restaurants.',
+                                          'Use your tokens to order delicious meals from your favorite mess.',
                                           style: TextStyle(
                                             fontSize: 11.5,
                                             color: _greySub,

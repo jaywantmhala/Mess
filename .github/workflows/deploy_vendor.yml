@@ -1,12 +1,13 @@
 name: Deploy Vendor App to Google Play Store
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'vendor_app/**'
-      - '.github/workflows/deploy_vendor.yml'
+  # Automated push disabled to deploy ONLY customer app. Trigger manually via GitHub Actions when needed.
+  # push:
+  #   branches:
+  #     - main
+  #   paths:
+  #     - 'vendor_app/**'
+  #     - '.github/workflows/deploy_vendor.yml'
   workflow_dispatch:
     inputs:
       track:

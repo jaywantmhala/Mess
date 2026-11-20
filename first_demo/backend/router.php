@@ -320,14 +320,14 @@ $routes = [
     'POST /api/customer/upi_pay'                 => __DIR__ . '/api/customer/upi_pay.php',
     'POST /api/customer/cashfree/create_order'   => __DIR__ . '/api/customer/cashfree_create_order.php',
     'POST /api/customer/cashfree/verify_payment' => __DIR__ . '/api/customer/cashfree_verify_payment.php',
-    'POST /api/customer/payu/create_order'       => __DIR__ . '/api/customer/payu_create_order.php',
-    'POST /api/customer/payu/verify_payment'     => __DIR__ . '/api/customer/payu_verify_payment.php',
+    'POST /api/customer/payu/create_order'       => __DIR__ . '/api/customer/razorpay_create_order.php',
+    'POST /api/customer/payu/verify_payment'     => __DIR__ . '/api/customer/razorpay_verify_payment.php',
     'POST /api/customer/payu/success'            => __DIR__ . '/api/customer/payu_success.php',
     'GET  /api/customer/payu/success'            => __DIR__ . '/api/customer/payu_success.php',
     'POST /api/customer/payu/failure'            => __DIR__ . '/api/customer/payu_failure.php',
     'GET  /api/customer/payu/failure'            => __DIR__ . '/api/customer/payu_failure.php',
-    'POST /api/customer/razorpay/create_order'   => __DIR__ . '/api/customer/payu_create_order.php',
-    'POST /api/customer/razorpay/verify_payment' => __DIR__ . '/api/customer/payu_verify_payment.php',
+    'POST /api/customer/razorpay/create_order'   => __DIR__ . '/api/customer/razorpay_create_order.php',
+    'POST /api/customer/razorpay/verify_payment' => __DIR__ . '/api/customer/razorpay_verify_payment.php',
 
     // ── Customer Subscriptions ───────────────────────────────────────────
     'GET  /api/customer/subscription/current' => __DIR__ . '/api/customer/subscription/current.php',

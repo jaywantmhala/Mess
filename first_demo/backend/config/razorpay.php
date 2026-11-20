@@ -3,9 +3,139 @@
  * Razorpay Configuration and Contact Integration
  */
 
-define('RAZORPAY_KEY_ID',     'rzp_test_TqYMLz1N1jVgi3');
-define('RAZORPAY_KEY_SECRET', 'gM1Q6Zfu26jJkC86SWf5Wi7E');
+define('RAZORPAY_KEY_ID',     'rzp_live_TM0oXWEH4xu1NQ');
+define('RAZORPAY_KEY_SECRET', '2MPBgz7jNk1Spez0pTo2f7WQ');
 define('RAZORPAY_BASE_URL',   'https://api.razorpay.com/v1');
+
+/**
+ * Creates a Razorpay Standard Payment Order (POST /v1/orders)
+ *
+ * @param array $orderData [
+ *   'amount'   => int (amount in paise),
+ *   'currency' => 'INR',
+ *   'receipt'  => string,
+ *   'notes'    => array,
+ * ]
+ * @return array ['success' => bool, 'id' => string|null, 'data' => array|null, 'error' => string|null]
+ */
+function createRazorpayOrder(array $orderData): array {
+    $url = RAZORPAY_BASE_URL . '/orders';
+
+    $payload = [
+        'amount'   => (int)($orderData['amount'] ?? 100),
+        'currency' => $orderData['currency'] ?? 'INR',
+        'receipt'  => (string)($orderData['receipt'] ?? ('rcpt_' . time())),
+        'notes'    => !empty($orderData['notes']) && is_array($orderData['notes']) ? $orderData['notes'] : [],
+    ];
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_USERPWD, RAZORPAY_KEY_ID . ':' . RAZORPAY_KEY_SECRET);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'Content-Type: application/json',
+    ]);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error    = curl_error($ch);
+
+    if ($response === false) {
+        error_log("[Razorpay Order] cURL Error: " . $error);
+        return [
+            'success' => false,
+            'id'      => null,
+            'error'   => $error,
+            'data'    => null,
+        ];
+    }
+
+    $decoded = json_decode($response, true);
+    if (!is_array($decoded)) {
+        error_log("[Razorpay Order] Invalid JSON response: " . $response);
+        return [
+            'success' => false,
+            'id'      => null,
+            'error'   => 'Invalid response from Razorpay: ' . $response,
+            'data'    => null,
+        ];
+    }
+
+    if ($httpCode >= 200 && $httpCode < 300 && !empty($decoded['id'])) {
+        return [
+            'success' => true,
+            'id'      => $decoded['id'],
+            'data'    => $decoded,
+            'error'   => null,
+        ];
+    }
+
+    $errMsg = $decoded['error']['description'] ?? ('Razorpay error HTTP ' . $httpCode);
+    error_log("[Razorpay Order] API Error [HTTP $httpCode]: " . $response);
+
+    return [
+        'success'   => false,
+        'id'        => null,
+        'error'     => $errMsg,
+        'data'      => $decoded,
+        'http_code' => $httpCode,
+    ];
+}
+
+/**
+ * Validates Razorpay Payment Signature
+ *
+ * @param string $orderId
+ * @param string $paymentId
+ * @param string $signature
+ * @return bool
+ */
+function verifyRazorpaySignature(string $orderId, string $paymentId, string $signature): bool {
+    if (empty($orderId) || empty($paymentId) || empty($signature)) {
+        return false;
+    }
+    $expected = hash_hmac('sha256', $orderId . '|' . $paymentId, RAZORPAY_KEY_SECRET);
+    return hash_equals($expected, $signature);
+}
+
+/**
+ * Fetches Razorpay Payment Details (GET /v1/payments/{paymentId})
+ */
+function fetchRazorpayPayment(string $paymentId): array {
+    $url = RAZORPAY_BASE_URL . '/payments/' . urlencode(trim($paymentId));
+
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_USERPWD, RAZORPAY_KEY_ID . ':' . RAZORPAY_KEY_SECRET);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+    curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $error    = curl_error($ch);
+
+    if ($response === false) {
+        return ['success' => false, 'error' => $error];
+    }
+
+    $decoded = json_decode($response, true);
+    if (!is_array($decoded)) {
+        return ['success' => false, 'error' => 'Invalid JSON from Razorpay'];
+    }
+
+    if ($httpCode >= 200 && $httpCode < 300) {
+        return ['success' => true, 'data' => $decoded];
+    }
+
+    return ['success' => false, 'error' => $decoded['error']['description'] ?? 'Error fetching payment'];
+}
 
 /**
  * Creates a Razorpay Contact (POST /v1/contacts)

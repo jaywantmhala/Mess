@@ -25,8 +25,8 @@ abstract class PaymentService {
   /// Dispose/clear instances
   void dispose();
 
-  /// Create PayU Order on PHP Backend API
-  Future<PayUOrderResult> createOrder(int planId);
+  /// Create Payment Order on PHP Backend API
+  Future<PayUOrderResult> createOrder(int planId, {double? amount});
 
   /// Open PayU Checkout Window/Popup
   Future<void> openCheckout({

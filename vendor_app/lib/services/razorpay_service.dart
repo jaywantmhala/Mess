@@ -6,10 +6,10 @@ import 'package:http/http.dart' as http;
 class RazorpayService {
   static const String contactsEndpoint = 'https://api.razorpay.com/v1/contacts';
   static const String fundAccountsEndpoint = 'https://api.razorpay.com/v1/fund_accounts';
-  static const String keyId = 'rzp_test_TqYMLz1N1jVgi3';
-  static const String keySecret = 'gM1Q6Zfu26jJkC86SWf5Wi7E';
+  static const String keyId = 'rzp_live_TM0oXWEH4xu1NQ';
+  static const String keySecret = '2MPBgz7jNk1Spez0pTo2f7WQ';
   static const String authorizationHeader =
-      'Basic cnpwX3Rlc3RfVHFZTUx6MU4xalZnaTM6Z00xUTZaZnUyNmpKa0M4NlNXZjVXaTdF';
+      'Basic cnpwX2xpdmVfVE0wb1hXRUg0eHUxTlE6Mk1QQmd6N2pOazFTcGV6MHBUbzJmN1dR';
 
   // Persistent HTTP client with connection pooling & HTTP keep-alive for millisecond-level latency
   static final http.Client _client = http.Client();

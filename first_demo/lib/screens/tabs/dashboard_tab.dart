@@ -273,7 +273,7 @@ class _HotelLocatorDashboardState extends State<HotelLocatorDashboard>
       if (mounted) {
         setState(() {
           _backendHotels = res.hotels
-              .where((h) => (h.distance ?? 0) <= 3.0)
+              .where((h) => (h.distance ?? 0) <= 5.0)
               .toList();
           _hasActiveSubscription = hasSub;
           _isLocationServiceable = locationServiceable;
@@ -303,8 +303,8 @@ class _HotelLocatorDashboardState extends State<HotelLocatorDashboard>
     return _backendHotels.map((h) {
       final dyKm = (h.latitude - userLat) * 111.0;
       final dxKm = (h.longitude - userLng) * 105.0;
-      final alignX = (dxKm / 3.0 * 0.72).clamp(-0.85, 0.85);
-      final alignY = (-(dyKm / 3.0) * 0.72).clamp(-0.85, 0.85);
+      final alignX = (dxKm / 5.0 * 0.72).clamp(-0.85, 0.85);
+      final alignY = (-(dyKm / 5.0) * 0.72).clamp(-0.85, 0.85);
       return HotelModel(
         id: h.id.toString(),
         name: h.hotelName,
@@ -808,7 +808,7 @@ class _HotelLocatorDashboardState extends State<HotelLocatorDashboard>
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
-                                    'Showing ${_hotels.length} hotels within 3 km',
+                                    'Showing ${_hotels.length} hotels within 5 km',
                                     style: const TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w800,

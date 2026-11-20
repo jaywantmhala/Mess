@@ -196,7 +196,7 @@ class _HotelsNearYouScreenState extends State<HotelsNearYouScreen> {
 
       final res = await HotelService.instance.getNearbyHotels(latitude: lat, longitude: lng);
       if (mounted) {
-        final allHotels = res.hotels.where((h) => (h.distance ?? 0) <= 3.0).toList();
+        final allHotels = res.hotels.where((h) => (h.distance ?? 0) <= 5.0).toList();
         setState(() {
           _allHotels = allHotels;
           _applyCombinedFilters();
